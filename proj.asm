@@ -32,10 +32,10 @@ inicio:
 ciclo:
     MOV  R1, LINHA     ; testa linha
 
-espera_tecla:          ; neste ciclo espera-se até uma tecla ser premida
-    MOVB [R2], R1      ; escrever no periférico de sa�da (linhas)
+espera_tecla:          ; neste ciclo espera-se até uma´ tecla ser premida
+    MOVB [R2], R1      ; escrever no periférico de saáda (linhas)
     MOVB R0, [R3]      ; ler do periférico de entrada (colunas)
-    AND  R0, R5        ; elimina bits para al�m dos bits 0-3
+    AND  R0, R5        ; elimina bits para além dos bits 0-3
     CMP  R0, 0         ; há tecla premida ?
     JNZ  ha            ; Se há teclado premida, continua para "ha"
     SHR  R1,1          ; Testa a proxima colina (da 4º linha para a 1º linha)
