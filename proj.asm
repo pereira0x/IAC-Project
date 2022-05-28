@@ -38,35 +38,35 @@ espera_tecla:          ; neste ciclo espera-se até uma tecla ser premida
     AND  R0, R5        ; elimina bits para al�m dos bits 0-3
     CMP  R0, 0         ; há tecla premida ?
     JNZ  ha            ; Se há teclado premida, continua para "ha"
-    SHR  R1,1          ; Testa proxima colina
-    JZ   ciclo         ; começa ciclo do inicio
+    SHR  R1,1          ; Testa a proxima colina (da 4º linha para a 1º linha)
+    JZ   ciclo         ; Se todas as linhas foram testadas, repete o ciclo
     JMP  espera_tecla  ; se nenhuma tecla premida, repete
     
 ha:    
 
 calcula_output:
-      MOV  R9, R1      ;linha
-      MOV  R11, R0     ;coluna
-      MOV R6,0
-      MOV R7,0
-      MOV R8,1
+      MOV  R9, R1      ; Numero da linha
+      MOV  R11, R0     ; Numero da coluna
+      MOV R6,0         ; 
+      MOV R7,0         ; 
+      MOV R8,1         ; 
 
-calcula_linha:
-    SHR R9,1
-    ADD R6,R8
-    CMP R9,0
-    JNZ calcula_linha
-    SUB R6,R8
+calcula_linha:         ;
+    SHR R9,1           ;
+    ADD R6,R8          ; 
+    CMP R9,0           ;
+    JNZ calcula_linha  ;
+    SUB R6,R8          ;
      
-calcula_coluna:
-    SHR R11,1
-    ADD R7,R8
-    CMP R11,0
-    JNZ calcula_coluna
-    SUB R7,R8
-    MOV R8,4
-    MUL R6, R8
-    ADD R6,R7
+calcula_coluna:        ;
+    SHR R11,1          ;
+    ADD R7,R8          ;
+    CMP R11,0          ;
+    JNZ calcula_coluna ;
+    SUB R7,R8          ;
+    MOV R8,4           ;
+    MUL R6, R8         ;
+    ADD R6,R7          ;
 
     MOVB [R4], R6      ; escreve linha e coluna nos displays
     
