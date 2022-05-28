@@ -64,11 +64,11 @@ espera_tecla:          ; neste ciclo espera-se até uma´ tecla ser premida
 ha:    
 
 calcula_output:
-      MOV  R9, R1      ; Numero da linha
-      MOV  R11, R0     ; Numero da coluna
-      MOV R6,0         ; 
-      MOV R7,0         ; 
-      MOV R8,1         ; 
+    MOV  R9, R1      ; Numero da linha
+    MOV  R11, R0     ; Numero da coluna
+    MOV R6,0         ; 
+    MOV R7,0         ; 
+    MOV R8,1         ; 
 
 calcula_linha:         ;
     SHR R9,1           ;
