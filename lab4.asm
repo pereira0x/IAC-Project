@@ -93,7 +93,7 @@ testa_limite_direito:		; vê se o boneco chegou ao limite direito
 	MOV	R5, MAX_COLUNA
 	CMP	R6, R5
 	JGT	inverte_para_esquerda
-	JMP	coluna_seguinte	; entre limites. Mnatém o valor do R7
+	JMP	coluna_seguinte	; entre limites. Mantém o valor do R7
 
 inverte_para_direita:
 	MOV	R7, 1			; passa a deslocar-se para a direita
@@ -103,3 +103,4 @@ inverte_para_esquerda:
 	
 coluna_seguinte:
 	ADD	R2, R7	
+    JMP	desenha_boneco		; vai desenhar o boneco de novo
