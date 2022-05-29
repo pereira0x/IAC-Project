@@ -54,6 +54,7 @@ ATRASO				EQU	0A00H	; atraso para limitar a velocidade de movimento do boneco
 LARGURA				EQU	5		; largura do Tubarao
 ALTURA				EQU 4		; Altura do Tubarao
 COR_PIXEL			EQU	 0FF00H	; cor do pixel: vermelho em ARGB (opaco e vermelho no máximo, verde e azul a 0)
+DISPLAYS   EQU 0A000H  ; endereço dos displays de 7 segmentos (periférico POUT-1)
 
 ; *********************************************************************************
 ; * Dados 
@@ -97,9 +98,13 @@ mostra_boneco:
 	MOV R11, ATRASO
 	CALL atraso
 
-espera_tecla:					; neste ciclo espera-se até uma tecla ser premida
+ciclo:
 	MOV  R6, LINHA_TECLADO		; linha a testar no teclado
+
+espera_tecla:					; neste ciclo espera-se até uma tecla ser premida
 	CALL	teclado				; leitura às teclas
+	SHR  R6,1          ; Testa a proxima colina (da 4º linha para a 1º linha)
+    JZ   ciclo         ; Se todas as linhas foram testadas, repete o ciclo
 	CMP	R0, 0
 	JZ	espera_tecla			; espera, enquanto não houver tecla
 	CMP	R0, TECLA_ESQUERDA
@@ -292,12 +297,16 @@ teclado:
 	PUSH	R2
 	PUSH	R3
 	PUSH	R5
+	PUSH R4
 	MOV  R2, TEC_LIN   			; endereço do periférico das linhas
 	MOV  R3, TEC_COL   			; endereço do periférico das colunas
 	MOV  R5, MASCARA   			; para isolar os 4 bits de menor peso, ao ler as colunas do teclado
 	MOVB [R2], R6      			; escrever no periférico de saída (linhas)
 	MOVB R0, [R3]      			; ler do periférico de entrada (colunas)
 	AND  R0, R5        			; elimina bits para além dos bits 0-3
+	MOV  R4, DISPLAYS  ; endereço do periférico dos displays
+	MOVB [R4], R0      ; escreve linha e coluna nos displays
+	POP R4
 	POP	R5
 	POP	R3
 	POP	R2
