@@ -49,7 +49,7 @@ COLUNA			EQU  30        ; coluna do boneco (a meio do ecrã)
 
 MIN_COLUNA		EQU  0		; número da coluna mais à esquerda que o objeto pode ocupar
 MAX_COLUNA		EQU  63        ; número da coluna mais à direita que o objeto pode ocupar
-ATRASO			EQU	0F00H		; atraso para limitar a velocidade de movimento do boneco
+ATRASO			EQU	0A00H		; atraso para limitar a velocidade de movimento do boneco
 
 LARGURA		EQU	5			; largura do Tubarao
 ALTURA		EQU 4			; Altura do Tubarao
