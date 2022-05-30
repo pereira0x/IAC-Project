@@ -10,7 +10,7 @@
 
 ; *********************************************************************
 ; * To Do
-; * - O teclado deve estar completamente funcional, detetando todas as teclas; 
+; * - O teclado deve estar completamente funcional, detetando todas as teclas; Feito
 ; *
 ; * - Deve desenhar o rover e movimentá-lo para a esquerda e para a direita (de forma 
 ; * contínua, enquanto se carrega na tecla), até atingir o limite do ecrã; Feito
