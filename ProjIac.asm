@@ -34,8 +34,8 @@ TEC_LIN				EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
 TEC_COL				EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
 LINHA_TECLADO		EQU 8		; linha a testar (4ª linha, 1000b)
 MASCARA				EQU 0FH		; para isolar os 4 bits de menor peso, ao ler as colunas do teclado
-TECLA_ESQUERDA		EQU 1		; tecla na primeira coluna do teclado (tecla C)
-TECLA_DIREITA		EQU 2		; tecla na segunda coluna do teclado (tecla D)
+TECLA_ESQUERDA		EQU 4		; tecla na primeira coluna do teclado (tecla C)
+TECLA_DIREITA		EQU 5		; tecla na segunda coluna do teclado (tecla D)
 
 DEFINE_LINHA    	EQU 600AH   ; endereço do comando para definir a linha
 DEFINE_COLUNA   	EQU 600CH   ; endereço do comando para definir a coluna
@@ -343,6 +343,7 @@ calcula_coluna:        ;
 
     MOV  R4, DISPLAYS  ; endereço do periférico dos displays
 	MOVB [R4], R5      ; escreve linha e coluna nos displays
+	MOV R0, R5
 	POP R11
 	POP R9
 	POP R8
