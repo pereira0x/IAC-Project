@@ -24,7 +24,7 @@
 ; *
 ; * - Use outras duas teclas para aumentar e diminuir o valor nos displays. Para já pode ser 
 ; * em hexadecimal, mas na versão final terá de fazer uma rotina para converter um 
-; * número qualquer para dígitos em decimal. 
+; * número qualquer para dígitos em decimal. Feito
 ; **********************************************************************
 
 ; *********************************************************************************
@@ -34,8 +34,14 @@ TEC_LIN				EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
 TEC_COL				EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
 LINHA_TECLADO		EQU 8		; linha a testar (4ª linha, 1000b)
 MASCARA				EQU 0FH		; para isolar os 4 bits de menor peso, ao ler as colunas do teclado
-TECLA_ESQUERDA		EQU 4		; tecla na primeira coluna do teclado (tecla C)
-TECLA_DIREITA		EQU 5		; tecla na segunda coluna do teclado (tecla D)
+
+TECLA_ESQUERDA		EQU 4		; tecla para movimentar para a esquerda (tecla 4)
+TECLA_DIREITA		EQU 5		; tecla para movimentar para a direita (tecla 5)
+TECLA_INCREMENTA    EQU 6       ; tecla para incrementar o contador (tecla 6)
+TECLA_DESINCREMENTA EQU 7       ; tecla para desincrementar o contador (tecla 7)
+
+LINHA_CONTADOR	 	EQU 2       ; linha onde estao as teclas de des/incrementar o contador.
+
 
 DEFINE_LINHA    	EQU 600AH   ; endereço do comando para definir a linha
 DEFINE_COLUNA   	EQU 600CH   ; endereço do comando para definir a coluna
@@ -79,35 +85,69 @@ DEF_BONECO:						; tabela que define o boneco (cor, largura, pixels)
 ; *********************************************************************************
 PLACE   0                     	; o código tem de começar em 0000H
 inicio:
-	MOV  SP, SP_inicial			; inicializa SP para a palavra a seguir
+	MOV SP, SP_inicial			; inicializa SP para a palavra a seguir
 								; à última da pilha
                             
-     MOV  [APAGA_AVISO], R1		; apaga o aviso de nenhum cenário selecionado (o valor de R1 não é relevante)
-     MOV  [APAGA_ECRÃ], R1		; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
+	MOV [APAGA_AVISO], R1		; apaga o aviso de nenhum cenário selecionado (o valor de R1 não é relevante)
+    MOV [APAGA_ECRÃ], R1		; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
 	MOV	R1, 0					; cenário de fundo número 0
-     MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+    MOV [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
 	MOV	R7, 1					; valor a somar à coluna do boneco, para o movimentar
+	MOV R5, DISPLAYS  			; endereço do periférico dos displays
+	MOV R8, 0					; contador global, iniciado a 0
+	MOV [R5], R8				; começar o valor nos displays a 0
      
 posição_boneco:
-     MOV  R1, LINHA				; linha do boneco
-     MOV  R2, COLUNA			; coluna do boneco
-	MOV	R4, DEF_BONECO		;	 endereço da tabela que define o boneco
+	MOV R1, LINHA				; linha do boneco
+    MOV R2, COLUNA				; coluna do boneco
+	MOV	R4, DEF_BONECO			; endereço da tabela que define o boneco
 
 mostra_boneco:
-	CALL	desenha_boneco		; desenha o boneco a partir da tabela
-	MOV R11, ATRASO
-	CALL atraso
+	CALL desenha_boneco			; desenha o boneco a partir da tabela
+	MOV R11, ATRASO				; obtem o valor do atraso (delay)
+	CALL atraso					; realiza o atraso (delay)
 
 ciclo:
-	MOV  R6, LINHA_TECLADO		; linha a testar no teclado
+	MOV R6, LINHA_TECLADO		; primeira linha a testar no teclado
+	JMP espera_tecla			; vai esperar por uma tecla premida
+
+incrementa:						; incrementa o contador por uma unidade e mete nos displays
+	ADD R8, 1					; incrementa uma unidade
+	MOV [R5], R8				; mete nos displays
+
+espera_incrementa:	
+	MOV R6, LINHA_CONTADOR      ; linha da tecla para incrementar
+	CALL teclado				; leitura às teclas
+	CMP	R0, TECLA_INCREMENTA	; verifica se a tecla ainda esta premida
+	JZ	espera_incrementa		; espera, enquanto houver tecla uma tecla premida
+	JMP espera_tecla			; ja nao ha tecla premida
+
+
+desincrementa:					; desincrementa o contador por uma unidade e mete nos dispalys
+	SUB R8, 0					; testa se o contador é 0
+	JZ espera_desincrementa		; se for 0, vai esperar enquanto estiver a tecla premida
+	SUB R8, 1					; desincrementa uma unidade
+	MOV [R5], R8				; escreve no display
+	JMP espera_desincrementa	; vai esperar enquanto a tecla estiver premida
+
+espera_desincrementa:	
+	MOV R6, LINHA_CONTADOR		; linha da tecla para desincrementar
+	CALL teclado				; leitura às teclas
+	CMP	R0, TECLA_DESINCREMENTA ; ve se a tecla ainda esta premida
+	JZ	espera_desincrementa	; espera, enquanto a tecla esta premida
+	JMP espera_tecla			; ja nao ha tecla premida
 
 espera_tecla:					; neste ciclo espera-se até uma tecla ser premida
-	CALL	teclado				; leitura às teclas
-	SHR  R6,1          ; Testa a proxima colina (da 4º linha para a 1º linha)
-    JZ   ciclo         ; Se todas as linhas foram testadas, repete o ciclo
-	CMP	R0, 0
-	JZ	espera_tecla			; espera, enquanto não houver tecla
-	CMP	R0, TECLA_ESQUERDA
+	CALL teclado				; leitura às teclas
+	SHR R6,1         			; Testa a proxima colina (da 4º linha para a 1º linha)
+    JZ ciclo      				; Se todas as linhas foram testadas, repete o ciclo
+	CMP	R0, 0					; ve se ha alguma tecla premida
+	JZ espera_tecla				; espera, enquanto não houver tecla premida
+	CMP R0, TECLA_INCREMENTA	; tecla para incrementar o contador
+	JZ incrementa				; vai incrementar
+	CMP R0, TECLA_DESINCREMENTA ; tecla para desincrementar o contador
+	JZ desincrementa			; vai desincrementar
+	CMP	R0, TECLA_ESQUERDA		
 	JNZ	testa_direita
 	MOV	R7, -1					; vai deslocar para a esquerda
 	JMP	ve_limites
@@ -118,12 +158,12 @@ testa_direita:
 	
 ve_limites:
 	MOV	R6, [R4]				; obtém a largura do boneco
-	CALL	testa_limites		; vê se chegou aos limites do ecrã e se sim força R7 a 0
+	CALL testa_limites			; vê se chegou aos limites do ecrã e se sim força R7 a 0
 	CMP	R7, 0
-	JZ	espera_tecla			; se não é para movimentar o objeto, vai ler o teclado de novo
+	JZ espera_tecla				; se não é para movimentar o objeto, vai ler o teclado de novo
 
 move_boneco:
-	CALL	apaga_boneco		; apaga o boneco na sua posição corrente
+	CALL apaga_boneco			; apaga o boneco na sua posição corrente
 	
 coluna_seguinte:
 	ADD	R2, R7					; para desenhar objeto na coluna seguinte (direita ou esquerda)
@@ -303,8 +343,8 @@ teclado:
 	MOVB [R2], R6      			; escrever no periférico de saída (linhas)
 	MOVB R0, [R3]      			; ler do periférico de entrada (colunas)
 	AND  R0, R5        			; elimina bits para além dos bits 0-3
-	JZ no_tecla
-	CALL calcula_output
+	JZ no_tecla					; caso nao haja nenhuma tecla premida, nao calcula nada
+	CALL calcula_output			; vai calcular o numero da tecla
 no_tecla:
 	POP	R5
 	POP	R3
@@ -312,7 +352,6 @@ no_tecla:
 	RET
 
  calcula_output:
-	PUSH R4
 	PUSH R5
 	PUSH R7
 	PUSH R8
@@ -341,13 +380,10 @@ calcula_coluna:        ;
     MUL R5, R8         ;
     ADD R5,R7          ;
 
-    MOV  R4, DISPLAYS  ; endereço do periférico dos displays
-	MOVB [R4], R5      ; escreve linha e coluna nos displays
-	MOV R0, R5
+	MOV R0, R5		   ; R0 vai ser o numero da tecla premida
 	POP R11
 	POP R9
 	POP R8
 	POP R7
 	POP R5
-	POP R4
 	RET
