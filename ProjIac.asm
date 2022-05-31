@@ -297,18 +297,56 @@ teclado:
 	PUSH	R2
 	PUSH	R3
 	PUSH	R5
-	PUSH R4
 	MOV  R2, TEC_LIN   			; endereço do periférico das linhas
 	MOV  R3, TEC_COL   			; endereço do periférico das colunas
 	MOV  R5, MASCARA   			; para isolar os 4 bits de menor peso, ao ler as colunas do teclado
 	MOVB [R2], R6      			; escrever no periférico de saída (linhas)
 	MOVB R0, [R3]      			; ler do periférico de entrada (colunas)
 	AND  R0, R5        			; elimina bits para além dos bits 0-3
-	MOV  R4, DISPLAYS  ; endereço do periférico dos displays
-	MOVB [R4], R0      ; escreve linha e coluna nos displays
-	POP R4
+	JZ no_tecla
+	CALL calcula_output
+no_tecla:
 	POP	R5
 	POP	R3
 	POP	R2
 	RET
 
+ calcula_output:
+	PUSH R4
+	PUSH R5
+	PUSH R7
+	PUSH R8
+	PUSH R9
+	PUSH R11
+    MOV  R9, R6        ; Numero da linha
+    MOV  R11, R0       ; Numero da coluna
+    MOV R5,0           ; 
+    MOV R7,0           ; 
+    MOV R8,1           ; 
+
+calcula_linha:         ;
+    SHR R9,1           ;
+    ADD R5,R8          ; 
+    CMP R9,0           ;
+    JNZ calcula_linha  ;
+    SUB R5,R8          ;
+     
+calcula_coluna:        ;
+    SHR R11,1          ;
+    ADD R7,R8          ;
+    CMP R11,0          ;
+    JNZ calcula_coluna ;
+    SUB R7,R8          ;
+    MOV R8,4           ;
+    MUL R5, R8         ;
+    ADD R5,R7          ;
+
+    MOV  R4, DISPLAYS  ; endereço do periférico dos displays
+	MOVB [R4], R5      ; escreve linha e coluna nos displays
+	POP R11
+	POP R9
+	POP R8
+	POP R7
+	POP R5
+	POP R4
+	RET
