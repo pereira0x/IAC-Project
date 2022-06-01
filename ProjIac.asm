@@ -32,13 +32,14 @@
 ; *********************************************************************************
 TEC_LIN				EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
 TEC_COL				EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
-LINHA_TECLADO		EQU 8		; linha a testar (4ª linha, 1000b)
+LINHA_TECLADO		EQU 1		; linha a testar (4ª linha, 1000b)
 MASCARA				EQU 0FH		; para isolar os 4 bits de menor peso, ao ler as colunas do teclado
 
 TECLA_ESQUERDA		EQU 4		; tecla para movimentar para a esquerda (tecla 4)
 TECLA_DIREITA		EQU 5		; tecla para movimentar para a direita (tecla 5)
 TECLA_INCREMENTA    EQU 6       ; tecla para incrementar o contador (tecla 6)
 TECLA_DESINCREMENTA EQU 7       ; tecla para desincrementar o contador (tecla 7)
+TECLA_METEORO		EQU 3		; tecla para movimentar a mina para baixo (tecla 3)
 
 LINHA_CONTADOR	 	EQU 2       ; linha onde estao as teclas de des/incrementar o contador.
 
@@ -136,16 +137,49 @@ ciclo:
 	JMP espera_tecla			; vai esperar por uma tecla premida
 
 incrementa:						; incrementa o contador por uma unidade e mete nos displays
-	CALL incrementa_contador
+	ADD R8, 1					; incrementa uma unidade
+	MOV [R5], R8				; mete nos displays
+
+espera_incrementa:	
+	MOV R6, LINHA_CONTADOR      ; linha da tecla para incrementar
+	CALL teclado				; leitura às teclas
+	CMP	R0, TECLA_INCREMENTA	; verifica se a tecla ainda esta premida
+	JZ	espera_incrementa		; espera, enquanto houver tecla uma tecla premida
 	JMP espera_tecla			; ja nao ha tecla premida
 
+
 desincrementa:					; desincrementa o contador por uma unidade e mete nos dispalys
-	CALL desincrementa_contador
+	SUB R8, 0					; testa se o contador é 0
+	JZ espera_desincrementa		; se for 0, vai esperar enquanto estiver a tecla premida
+	SUB R8, 1					; desincrementa uma unidade
+	MOV [R5], R8				; escreve no display
+	JMP espera_desincrementa	; vai esperar enquanto a tecla estiver premida
+
+espera_desincrementa:	
+	MOV R6, LINHA_CONTADOR		; linha da tecla para desincrementar
+	CALL teclado				; leitura às teclas
+	CMP	R0, TECLA_DESINCREMENTA ; ve se a tecla ainda esta premida
+	JZ	espera_desincrementa	; espera, enquanto a tecla esta premida
+	JMP espera_tecla			; ja nao ha tecla premida
+
+move_meteoro:
+	CALL apaga_meteoro
+	ADD R9, +1
+	CALL desenha_meteoro
+	JMP espera_meteoro	; vai esperar enquanto a tecla estiver premida
+
+espera_meteoro:	
+	MOV R6, 1		; linha da tecla para desincrementar
+	CALL teclado				; leitura às teclas
+	CMP	R0, TECLA_METEORO ; ve se a tecla ainda esta premida
+	JZ	espera_meteoro	; espera, enquanto a tecla esta premida
 	JMP espera_tecla			; ja nao ha tecla premida
 
 espera_tecla:					; neste ciclo espera-se até uma tecla ser premida
 	CALL teclado				; leitura às teclas
-	SHR R6,1         			; Testa a proxima colina (da 4º linha para a 1º linha)
+	SHL R6,1         			; Testa a proxima colina (da 4º linha para a 1º linha)
+	MOV R8, MASCARA
+	AND R6, R8
     JZ ciclo      				; Se todas as linhas foram testadas, repete o ciclo
 	CMP	R0, 0					; ve se ha alguma tecla premida
 	JZ espera_tecla				; espera, enquanto não houver tecla premida
@@ -153,6 +187,8 @@ espera_tecla:					; neste ciclo espera-se até uma tecla ser premida
 	JZ incrementa				; vai incrementar
 	CMP R0, TECLA_DESINCREMENTA ; tecla para desincrementar o contador
 	JZ desincrementa			; vai desincrementar
+	CMP R0, TECLA_METEORO
+	JZ move_meteoro
 	CMP	R0, TECLA_ESQUERDA		
 	JNZ	testa_direita
 	MOV	R7, -1					; vai deslocar para a esquerda
@@ -170,11 +206,9 @@ ve_limites:
 
 move_boneco:
 	CALL apaga_boneco			; apaga o boneco na sua posição corrente
-	CALL apaga_meteoro			; apaga o boneco na sua posição corrente
 	
 coluna_seguinte:
 	ADD	R2, R7					; para desenhar objeto na coluna seguinte (direita ou esquerda)
-
 	JMP	mostra_boneco			; vai desenhar o boneco de novo
 
 
@@ -195,43 +229,7 @@ desenha_meteoro:
 	POP R3
 	POP R2
 	POP R1
-
-;**********************************************************************
-; DESINCREMENTA_CONTADOR - Desenha um boneco na linha e coluna indicadas
-;
-; **********************************************************************
-
-desincrementa_contador:					; desincrementa o contador por uma unidade e mete nos dispalys
-	SUB R8, 0					; testa se o contador é 0
-	JZ espera_desincrementa		; se for 0, vai esperar enquanto estiver a tecla premida
-	SUB R8, 1					; desincrementa uma unidade
-	MOV [R5], R8				; escreve no display
-	JMP espera_desincrementa	; vai esperar enquanto a tecla estiver premida
-
-espera_desincrementa:	
-	MOV R6, LINHA_CONTADOR		; linha da tecla para desincrementar
-	CALL teclado				; leitura às teclas
-	CMP	R0, TECLA_DESINCREMENTA ; ve se a tecla ainda esta premida
-	JZ	espera_desincrementa	; espera, enquanto a tecla esta premida
 	RET
-
-;**********************************************************************
-; DESINCREMENTA_CONTADOR - Desenha um boneco na linha e coluna indicadas
-;
-; **********************************************************************
-
-
-incrementa_contador:
-	ADD R8, 1					; incrementa uma unidade
-	MOV [R5], R8				; mete nos displays
-
-espera_incrementa:	
-	MOV R6, LINHA_CONTADOR      ; linha da tecla para incrementar
-	CALL teclado				; leitura às teclas
-	CMP	R0, TECLA_INCREMENTA	; verifica se a tecla ainda esta premida
-	JZ	espera_incrementa		; espera, enquanto houver tecla uma tecla premida
-	RET
-
 
 ;**********************************************************************
 ; DESENHA_BONECO - Desenha um boneco na linha e coluna indicadas
@@ -304,6 +302,7 @@ apaga_meteoro:
 	POP R3
 	POP R2
 	POP R1
+	RET
 
 apaga_boneco:
 	PUSH 	R1
