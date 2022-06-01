@@ -43,7 +43,7 @@ TECLA_METEORO		EQU 3		; tecla para movimentar a mina para baixo (tecla 3)
 
 LINHA_CONTADOR	 	EQU 2       ; linha onde estao as teclas de des/incrementar o contador.
 
-
+TOCA_SOM			EQU 605AH   	; endereço do comando para tocar um som
 DEFINE_LINHA    	EQU 600AH   ; endereço do comando para definir a linha
 DEFINE_COLUNA   	EQU 600CH   ; endereço do comando para definir a coluna
 DEFINE_PIXEL    	EQU 6012H   ; endereço do comando para escrever um pixel
@@ -165,6 +165,10 @@ espera_desincrementa:
 move_meteoro:
 	CALL apaga_meteoro
 	ADD R9, +1
+	PUSH R11
+	MOV	R11, 0			; som com número 0
+	MOV [TOCA_SOM], R11		; comando para tocar o som
+	POP R11
 	CALL desenha_meteoro
 	JMP espera_meteoro	; vai esperar enquanto a tecla estiver premida
 
@@ -177,9 +181,11 @@ espera_meteoro:
 
 espera_tecla:					; neste ciclo espera-se até uma tecla ser premida
 	CALL teclado				; leitura às teclas
-	SHL R6,1         			; Testa a proxima colina (da 4º linha para a 1º linha)
+	SHL R6,1   
+	PUSH R8      			; Testa a proxima colina (da 4º linha para a 1º linha)
 	MOV R8, MASCARA
 	AND R6, R8
+	POP R8	
     JZ ciclo      				; Se todas as linhas foram testadas, repete o ciclo
 	CMP	R0, 0					; ve se ha alguma tecla premida
 	JZ espera_tecla				; espera, enquanto não houver tecla premida
