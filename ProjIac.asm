@@ -53,6 +53,10 @@ SELECIONA_CENARIO_FUNDO  EQU 6042H   ; endereço do comando para selecionar uma 
 LINHA        		EQU  27     ; linha do boneco (a meio do ecrã))
 COLUNA				EQU  30     ; coluna do boneco (a meio do ecrã)
 
+LINHAMETEO       		EQU  0     ; linha do boneco (a meio do ecrã))
+COLUNAMETEO				EQU  10     ; coluna do boneco (a meio do ecrã)
+ALTURAMETEO				EQU 5		; Altura do MINA
+
 MIN_COLUNA			EQU  0		; número da coluna mais à esquerda que o objeto pode ocupar
 MAX_COLUNA			EQU  63     ; número da coluna mais à direita que o objeto pode ocupar
 ATRASO				EQU	0A00H	; atraso para limitar a velocidade de movimento do boneco
@@ -80,6 +84,15 @@ DEF_BONECO:						; tabela que define o boneco (cor, largura, pixels)
     WORD		0F000H, 0F39FH, 0FFFFH, 0F39FH, 0F000H 
 	WORD		0F39FH, 0FFFFH, 0FF00H, 0FFFFH, 0F39FH
 	WORD		0FFFFH, 0FF00H, 0FC00H, 0FF00H, 0FFFFH
+
+DEF_METEORO:						; tabela que define o boneco (cor, largura, pixels)
+	WORD		LARGURA
+	WORD		ALTURAMETEO
+	WORD    0F000H, 0, 0A000H, 0, 0F000H
+	WORD    0, 0F000H, 0F000H, 0F000H, 0
+	WORD    0A000H, 0F000H, 0FF00H, 0F000H, 0A000H
+	WORD    0, 0F000H, 0F000H, 0F000H, 0
+	WORD    0F000H, 0, 0A000H, 0, 0F000H
 ; *********************************************************************************
 ; * Código
 ; *********************************************************************************
@@ -97,6 +110,11 @@ inicio:
 	MOV R8, 0					; contador global, iniciado a 0
 	MOV [R5], R8				; começar o valor nos displays a 0
      
+posição_meteo:
+	MOV  R9, LINHAMETEO                ; linha do boneco
+	MOV  R10, COLUNAMETEO            ; coluna do boneco
+	MOV  R3, DEF_METEORO        ;     endereço da tabela que define o boneco
+
 posição_boneco:
 	MOV R1, LINHA				; linha do boneco
     MOV R2, COLUNA				; coluna do boneco
@@ -104,6 +122,12 @@ posição_boneco:
 
 mostra_boneco:
 	CALL desenha_boneco			; desenha o boneco a partir da tabela
+	MOV R11, ATRASO				; obtem o valor do atraso (delay)
+	CALL atraso					; realiza o atraso (delay)
+
+
+mostra_meteoro:
+	CALL desenha_meteoro			; desenha o boneco a partir da tabela
 	MOV R11, ATRASO				; obtem o valor do atraso (delay)
 	CALL atraso					; realiza o atraso (delay)
 
@@ -164,6 +188,7 @@ ve_limites:
 
 move_boneco:
 	CALL apaga_boneco			; apaga o boneco na sua posição corrente
+	CALL apaga_meteoro			; apaga o boneco na sua posição corrente
 	
 coluna_seguinte:
 	ADD	R2, R7					; para desenhar objeto na coluna seguinte (direita ou esquerda)
@@ -171,7 +196,25 @@ coluna_seguinte:
 	JMP	mostra_boneco			; vai desenhar o boneco de novo
 
 
-; **********************************************************************
+desenha_meteoro:
+	PUSH R1
+	PUSH R2
+	PUSH R3
+	PUSH R4
+	PUSH R9
+	PUSH R10
+	MOV R1,R9
+	MOV R2,R10
+	MOV R4,R3
+	CALL desenha_boneco
+	POP R10
+	POP R9
+	POP R4
+	POP R3
+	POP R2
+	POP R1
+
+;**********************************************************************
 ; DESENHA_BONECO - Desenha um boneco na linha e coluna indicadas
 ;			    com a forma e cor definidas na tabela indicada.
 ; Argumentos:   R1 - linha
@@ -225,6 +268,24 @@ desenha_pixels:       			; desenha os pixels do boneco a partir da tabela
 ;               R4 - tabela que define o boneco
 ;
 ; **********************************************************************
+apaga_meteoro:
+	PUSH R1
+	PUSH R2
+	PUSH R3
+	PUSH R4
+	PUSH R9
+	PUSH R10
+	MOV R1,R9
+	MOV R2,R10
+	MOV R4,R3
+	CALL apaga_boneco
+	POP R10
+	POP R9
+	POP R4
+	POP R3
+	POP R2
+	POP R1
+
 apaga_boneco:
 	PUSH 	R1
 	PUSH	R2
