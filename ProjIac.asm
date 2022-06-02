@@ -60,6 +60,7 @@ ALTURAMETEO				EQU 5		; Altura do MINA
 
 MIN_COLUNA			EQU  0		; número da coluna mais à esquerda que o objeto pode ocupar
 MAX_COLUNA			EQU  63     ; número da coluna mais à direita que o objeto pode ocupar
+MAX_LINHA 			EQU 001FH
 ATRASO				EQU	0A00H	; atraso para limitar a velocidade de movimento do boneco
 
 LARGURA				EQU	5		; largura do Tubarao
@@ -164,6 +165,11 @@ espera_desincrementa:
 
 move_meteoro:
 	CALL apaga_meteoro
+	PUSH R3
+	MOV R3, MAX_LINHA
+	CMP R3, R9
+	POP R3
+	JZ espera_meteoro
 	ADD R9, +1
 	PUSH R11
 	MOV	R11, 0			; som com número 0
