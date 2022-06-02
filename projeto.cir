@@ -1431,11 +1431,7 @@
     "moduleDelay" : 5,
     "positionX" : 978,
     "positionY" : 608,
-    "simGuiVisibleInSimulation" : true,
-    "simGuiXRelative" : 1639,
-    "simGuiYRelative" : 561,
-    "simGuiWidth" : 150,
-    "simGuiHeight" : 178,
+    "simGuiVisibleInSimulation" : false,
     "columns" : 4,
     "key numbers radix" : "Hexadecimal",
     "key color" : "Default",
@@ -1513,6 +1509,13 @@
     "windowScreenHeightixels" : 512,
     "defaultPenColor" : 51063,
     "image paths" : [ "Pixel_art_water_animation_4.gif" ],
+    "sounds/videos settings" : [ {
+      "filePathName" : "Sonar.mp3",
+      "relative sound volume" : 1.0,
+      "relative start time" : 0.0,
+      "relative stop time" : 1.0,
+      "playAsClip" : false
+    } ],
     "addressable data" : {
       "className" : "ModuleExtensionMemoryMediaCenter",
       "elementID" : 83,

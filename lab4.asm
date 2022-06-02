@@ -20,6 +20,7 @@ COLUNA			EQU  30        ; coluna do boneco (a meio do ecrã)
 
 MIN_COLUNA		EQU  0		; número da coluna mais à esquerda que o objeto pode ocupar
 MAX_COLUNA		EQU  63        ; número da coluna mais à direita que o objeto pode ocupar
+MAX_LINHA		EQU 40
 ATRASO			EQU	400H		; atraso para limitar a velocidade de movimento do boneco
 
 LARGURA		EQU	5			; largura do boneco
@@ -79,9 +80,9 @@ apaga_pixels:       		; desenha os pixels do boneco a partir da tabela
 	MOV  [DEFINE_LINHA], R1	; seleciona a linha
 	MOV  [DEFINE_COLUNA], R6	; seleciona a coluna
 	MOV  [DEFINE_PIXEL], R3	; altera a cor do pixel na linha e coluna selecionadas
-     ADD  R6, 1               ; próxima coluna
-     SUB  R5, 1			; menos uma coluna para tratar
-     JNZ  apaga_pixels		; continua até percorrer toda a largura do objeto
+    ADD  R6, 1               ; próxima coluna
+    SUB  R5, 1			; menos uma coluna para tratar
+    JNZ  apaga_pixels		; continua até percorrer toda a largura do objeto
 
 testa_limite_esquerdo:		; vê se o boneco chegou ao limite esquerdo
 	MOV	R5, MIN_COLUNA

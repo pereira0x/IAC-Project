@@ -121,14 +121,14 @@ posição_boneco:
     MOV R2, COLUNA				; coluna do boneco
 	MOV	R4, DEF_BONECO			; endereço da tabela que define o boneco
 
-mostra_boneco:
-	CALL desenha_boneco			; desenha o boneco a partir da tabela
-	MOV R11, ATRASO				; obtem o valor do atraso (delay)
-	CALL atraso					; realiza o atraso (delay)
-
 
 mostra_meteoro:
 	CALL desenha_meteoro			; desenha o boneco a partir da tabela
+	MOV R11, ATRASO				; obtem o valor do atraso (delay)
+	CALL atraso					; realiza o atraso (delay)
+
+mostra_boneco:
+	CALL desenha_boneco			; desenha o boneco a partir da tabela
 	MOV R11, ATRASO				; obtem o valor do atraso (delay)
 	CALL atraso					; realiza o atraso (delay)
 
