@@ -1,10 +1,11 @@
 ; *********************************************************************
 ; * IST-UL
 ; * Disciplina: IAC
-; * Versão:    Intermédia
-; * Autores:  Henrique Dutra - 99234
-; *           José Pereira   - 103252
-; *           Miguel Parece  - 103369 
+; * Versão:     Intermédia
+; * Grupo:	    23
+; * Autores:    Henrique Dutra - 99234
+; *             José Pereira   - 103252
+; *             Miguel Parece  - 103369 
 ; *
 ; *********************************************************************
 
@@ -484,7 +485,7 @@ calcula_output:		   ; Calcula o valor da tecla premida (0 a F)
 	PUSH R11
     MOV  R9, R6        ; Numero da linha
     MOV  R11, R0       ; Numero da coluna
-    MOV R5,0           ; 
+    MOV R5,0           ; 	
     MOV R7,0           ; 
     MOV R8,1           ; 
 
