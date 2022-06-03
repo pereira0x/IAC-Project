@@ -2,29 +2,20 @@
 ; * IST-UL
 ; * Disciplina: IAC
 ; * Versão:    Intermédia
-; * Autores: - Henrique Dutra - 99234
-; *            José Pereira - 103252
-; *            Miguel Parece - 103369 
+; * Autores:  Henrique Dutra - 99234
+; *           José Pereira   - 103252
+; *           Miguel Parece  - 103369 
 ; *
 ; *********************************************************************
 
 ; *********************************************************************
-; * To Do
-; * - O teclado deve estar completamente funcional, detetando todas as teclas; Feito
-; *
-; * - Deve desenhar o rover e movimentá-lo para a esquerda e para a direita (de forma 
-; * contínua, enquanto se carrega na tecla), até atingir o limite do ecrã; Feito
-; *
-; * - Deve desenhar um meteoro (bom ou mau), no tamanho máximo, numa coluna 
-; * qualquer, no topo do ecrã. Esse meteoro deve descer uma linha no ecrã sempre que se 
-; * carrega numa tecla (escolha qual), mas apenas uma linha por cada clique na tecla 
-; *
-; * - Deve ter um cenário de fundo e um efeito sonoro, de cada vez que se carrega na tecla 
-; * para o meteoro descer 
-; *
-; * - Use outras duas teclas para aumentar e diminuir o valor nos displays. Para já pode ser 
-; * em hexadecimal, mas na versão final terá de fazer uma rotina para converter um 
-; * número qualquer para dígitos em decimal. Feito
+; Instruções:
+; Teclas:
+;	- 3 : Movimentar a mina para baixo
+;	- 4 : Movimentar o tubarão para a esquerda
+;	- 5 : Movimentar o tubarão para a direita
+;	- 6 : Incrementar o contador
+;	- 7 : Desincrementar o contador
 ; **********************************************************************
 
 ; *********************************************************************************
@@ -32,18 +23,22 @@
 ; *********************************************************************************
 TEC_LIN				EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
 TEC_COL				EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
-LINHA_TECLADO		EQU 1		; linha a testar (4ª linha, 1000b)
-MASCARA				EQU 0FH		; para isolar os 4 bits de menor peso, ao ler as colunas do teclado
+DISPLAYS   			EQU 0A000H  ; endereço dos displays de 7 segmentos (periférico POUT-1)
+LINHA_TECLADO		EQU 1		; linha a testar (1ª linha, 0001b)
+MASCARA				EQU 0FH		; para isolar os 4 bits de menor peso
 
-TECLA_ESQUERDA		EQU 4		; tecla para movimentar para a esquerda (tecla 4)
-TECLA_DIREITA		EQU 5		; tecla para movimentar para a direita (tecla 5)
-TECLA_INCREMENTA    EQU 6       ; tecla para incrementar o contador (tecla 6)
-TECLA_DESINCREMENTA EQU 7       ; tecla para desincrementar o contador (tecla 7)
-TECLA_METEORO		EQU 3		; tecla para movimentar a mina para baixo (tecla 3)
+TOCA_SOM			EQU 605AH   ; endereço do comando para tocar um som
 
+TECLA_METEORO		EQU 3		; tecla para movimentar a mina para baixo
+TECLA_ESQUERDA		EQU 4		; tecla para movimentar o tubarão para a esquerda
+TECLA_DIREITA		EQU 5		; tecla para movimentar o tubarão para a direita
+TECLA_INCREMENTA    EQU 6       ; tecla para incrementar o contador
+TECLA_DESINCREMENTA EQU 7       ; tecla para desincrementar o contador
+
+LINHA_MOVE_MINA		EQU 1		; linha onde esta a tecla de mover a mina
 LINHA_CONTADOR	 	EQU 2       ; linha onde estao as teclas de des/incrementar o contador.
 
-TOCA_SOM			EQU 605AH   	; endereço do comando para tocar um som
+
 DEFINE_LINHA    	EQU 600AH   ; endereço do comando para definir a linha
 DEFINE_COLUNA   	EQU 600CH   ; endereço do comando para definir a coluna
 DEFINE_PIXEL    	EQU 6012H   ; endereço do comando para escrever um pixel
@@ -51,22 +46,21 @@ APAGA_AVISO     	EQU 6040H   ; endereço do comando para apagar o aviso de nenhu
 APAGA_ECRÃ	 		EQU 6002H   ; endereço do comando para apagar todos os pixels já desenhados
 SELECIONA_CENARIO_FUNDO  EQU 6042H   ; endereço do comando para selecionar uma imagem de fundo
 
-LINHA        		EQU  27     ; linha do boneco (a meio do ecrã))
-COLUNA				EQU  30     ; coluna do boneco (a meio do ecrã)
+LINHA        		EQU 27      ; linha do boneco (a meio do ecrã))
+COLUNA				EQU 30      ; coluna do boneco (a meio do ecrã)
 
-LINHAMETEO       		EQU  0     ; linha do boneco (a meio do ecrã))
-COLUNAMETEO				EQU  10     ; coluna do boneco (a meio do ecrã)
-ALTURAMETEO				EQU 5		; Altura do MINA
+LINHA_MINA       	EQU 0 	    ; linha da mina
+COLUNA_MINA			EQU 10  	; coluna da mina
+ALTURA_MINA			EQU 5		; Altura da mina
 
-MIN_COLUNA			EQU  0		; número da coluna mais à esquerda que o objeto pode ocupar
-MAX_COLUNA			EQU  63     ; número da coluna mais à direita que o objeto pode ocupar
-MAX_LINHA 			EQU 001FH
+MIN_COLUNA			EQU 0		; número da coluna mais à esquerda que o objeto pode ocupar
+MAX_COLUNA			EQU 63      ; número da coluna mais à direita que o objeto pode ocupar
+MAX_LINHA 			EQU 001FH	; número da linha mais a baixo que a mina pode ocupar.
+
 ATRASO				EQU	0A00H	; atraso para limitar a velocidade de movimento do boneco
 
-LARGURA				EQU	5		; largura do Tubarao
-ALTURA				EQU 4		; Altura do Tubarao
-COR_PIXEL			EQU	 0FF00H	; cor do pixel: vermelho em ARGB (opaco e vermelho no máximo, verde e azul a 0)
-DISPLAYS   EQU 0A000H  ; endereço dos displays de 7 segmentos (periférico POUT-1)
+LARGURA				EQU	5		; largura do tubarão e da mina
+ALTURA_TUBARAO		EQU 4		; altura do tubarão
 
 ; *********************************************************************************
 ; * Dados 
@@ -79,22 +73,23 @@ SP_inicial:						; este é o endereço (1200H) com que o SP deve ser
 								; inicializado. O 1.º end. de retorno será 
 								; armazenado em 11FEH (1200H-2)
 							
-DEF_BONECO:						; tabela que define o boneco (cor, largura, pixels)
+DEF_TUBARAO:					; tabela que define o tubarão (cor, largura, pixels)
 	WORD		LARGURA
-	WORD		ALTURA
+	WORD		ALTURA_TUBARAO
 	WORD    0, 0, 0F258H, 0, 0
 	WORD    0F000H, 0F258H, 0FFFFH, 0F258H, 0F000H 
 	WORD    0F258H, 0FFFFH, 0FF00H, 0FFFFH, 0F258H
 	WORD    0FFFFH, 0FF00H, 0FB00H, 0FF00H, 0FFFFH
 
-DEF_METEORO:						; tabela que define o boneco (cor, largura, pixels)
+DEF_MINA:						; tabela que define a mina (cor, largura, pixels)
 	WORD		LARGURA
-	WORD		ALTURAMETEO
+	WORD		ALTURA_MINA
 	WORD    0F000H, 0, 0A000H, 0, 0F000H
 	WORD    0, 0F000H, 0F000H, 0F000H, 0
 	WORD    0A000H, 0F000H, 0FF00H, 0F000H, 0A000H
 	WORD    0, 0F000H, 0F000H, 0F000H, 0
 	WORD    0F000H, 0, 0A000H, 0, 0F000H
+
 ; *********************************************************************************
 ; * Código
 ; *********************************************************************************
@@ -112,99 +107,51 @@ inicio:
 	MOV R8, 0					; contador global, iniciado a 0
 	MOV [R5], R8				; começar o valor nos displays a 0
      
-posição_meteo:
-	MOV  R9, LINHAMETEO                ; linha do boneco
-	MOV  R10, COLUNAMETEO            ; coluna do boneco
-	MOV  R3, DEF_METEORO        ;     endereço da tabela que define o boneco
+posição_mina:
+	MOV  R9, LINHA_MINA         ; linha da mina
+	MOV  R10, COLUNA_MINA       ; coluna da mina
+	MOV  R3, DEF_MINA           ; endereço da tabela que define a mina
 
-posição_boneco:
-	MOV R1, LINHA				; linha do boneco
-    MOV R2, COLUNA				; coluna do boneco
-	MOV	R4, DEF_BONECO			; endereço da tabela que define o boneco
+posição_tubarão:
+	MOV R1, LINHA				; linha do tubarão
+    MOV R2, COLUNA				; coluna do tubarão
+	MOV	R4, DEF_TUBARAO			; endereço da tabela que define o tubarão
 
+mostra_mina:
+	CALL desenha_mina			; desenha a mina a partir da tabela
+	MOV R11, ATRASO				; obtem o valor do atraso
+	CALL atraso					; realiza o atraso
 
-mostra_meteoro:
-	CALL desenha_meteoro			; desenha o boneco a partir da tabela
-	MOV R11, ATRASO				; obtem o valor do atraso (delay)
-	CALL atraso					; realiza o atraso (delay)
+mostra_tubarao:
+	CALL desenha_boneco		; desenha o tubarao a partir da tabela
+	MOV R11, ATRASO				; obtem o valor do atraso
+	CALL atraso					; realiza o atraso
 
-mostra_boneco:
-	CALL desenha_boneco			; desenha o boneco a partir da tabela
-	MOV R11, ATRASO				; obtem o valor do atraso (delay)
-	CALL atraso					; realiza o atraso (delay)
-
-ciclo:
+reset_teclado:
 	MOV R6, LINHA_TECLADO		; primeira linha a testar no teclado
 	JMP espera_tecla			; vai esperar por uma tecla premida
 
-incrementa:						; incrementa o contador por uma unidade e mete nos displays
-	ADD R8, 1					; incrementa uma unidade
-	MOV [R5], R8				; mete nos displays
-
-espera_incrementa:	
-	MOV R6, LINHA_CONTADOR      ; linha da tecla para incrementar
-	CALL teclado				; leitura às teclas
-	CMP	R0, TECLA_INCREMENTA	; verifica se a tecla ainda esta premida
-	JZ	espera_incrementa		; espera, enquanto houver tecla uma tecla premida
-	JMP espera_tecla			; ja nao ha tecla premida
-
-
-desincrementa:					; desincrementa o contador por uma unidade e mete nos dispalys
-	SUB R8, 0					; testa se o contador é 0
-	JZ espera_desincrementa		; se for 0, vai esperar enquanto estiver a tecla premida
-	SUB R8, 1					; desincrementa uma unidade
-	MOV [R5], R8				; escreve no display
-	JMP espera_desincrementa	; vai esperar enquanto a tecla estiver premida
-
-espera_desincrementa:	
-	MOV R6, LINHA_CONTADOR		; linha da tecla para desincrementar
-	CALL teclado				; leitura às teclas
-	CMP	R0, TECLA_DESINCREMENTA ; ve se a tecla ainda esta premida
-	JZ	espera_desincrementa	; espera, enquanto a tecla esta premida
-	JMP espera_tecla			; ja nao ha tecla premida
-
-move_meteoro:
-	CALL apaga_meteoro
-	PUSH R3
-	MOV R3, MAX_LINHA
-	CMP R3, R9
-	POP R3
-	JZ espera_meteoro
-	ADD R9, +1
-	PUSH R11
-	MOV	R11, 0			; som com número 0
-	MOV [TOCA_SOM], R11		; comando para tocar o som
-	POP R11
-	CALL desenha_meteoro
-	JMP espera_meteoro	; vai esperar enquanto a tecla estiver premida
-
-espera_meteoro:	
-	MOV R6, 1		; linha da tecla para desincrementar
-	CALL teclado				; leitura às teclas
-	CMP	R0, TECLA_METEORO ; ve se a tecla ainda esta premida
-	JZ	espera_meteoro	; espera, enquanto a tecla esta premida
-	JMP espera_tecla			; ja nao ha tecla premida
-
 espera_tecla:					; neste ciclo espera-se até uma tecla ser premida
 	CALL teclado				; leitura às teclas
-	SHL R6,1   
-	PUSH R8      			; Testa a proxima colina (da 4º linha para a 1º linha)
-	MOV R8, MASCARA
-	AND R6, R8
+	SHL R6,1					; Testa a proxima colina (da 1º linha para a 4º linha)
+	PUSH R8      				
+	MOV R8, MASCARA				; mascara com "1" nos 4 bits de menor peso
+	AND R6, R8					; isolar os 4 bits de menor peso
 	POP R8	
-    JZ ciclo      				; Se todas as linhas foram testadas, repete o ciclo
+    JZ reset_teclado      		; Se todas as linhas foram testadas, repete o ciclo
 	CMP	R0, 0					; ve se ha alguma tecla premida
 	JZ espera_tecla				; espera, enquanto não houver tecla premida
 	CMP R0, TECLA_INCREMENTA	; tecla para incrementar o contador
-	JZ incrementa				; vai incrementar
+	JZ incrementa		
 	CMP R0, TECLA_DESINCREMENTA ; tecla para desincrementar o contador
-	JZ desincrementa			; vai desincrementar
-	CMP R0, TECLA_METEORO
-	JZ move_meteoro
-	CMP	R0, TECLA_ESQUERDA		
-	JNZ	testa_direita
+	JZ desincrementa	
+	CMP R0, TECLA_METEORO		; tecla para mover o meteoro
+	JZ move_mina		
+	CMP	R0, TECLA_ESQUERDA		; tecla para andar para a esquerda
+	JNZ	testa_direita			; 
 	MOV	R7, -1					; vai deslocar para a esquerda
 	JMP	ve_limites
+
 testa_direita:
 	CMP	R0, TECLA_DIREITA
 	JNZ	espera_tecla			; tecla que não interessa
@@ -221,10 +168,28 @@ move_boneco:
 	
 coluna_seguinte:
 	ADD	R2, R7					; para desenhar objeto na coluna seguinte (direita ou esquerda)
-	JMP	mostra_boneco			; vai desenhar o boneco de novo
+	JMP	mostra_tubarao			; vai desenhar o boneco de novo
 
+incrementa:
+	CALL incrementaContador		; incrementa o contador e escreve nos displays
+	JMP espera_tecla			; ja nao ha tecla premida
 
-desenha_meteoro:
+desincrementa:				
+	CALL desincrementaContador  ; desincrementa o contador e escreve nos displays
+	JMP espera_tecla			; ja nao ha tecla premida
+
+move_mina:
+	CALL desce_mina				; desce a mina para a linha em baixo
+	JMP espera_tecla			; ja nao ha tecla premida
+
+;**********************************************************************
+; DESENHA_MINA - Desenha a mina na linha e coluna indicadas
+;			    com a forma e cor definidas na tabela indicada.
+; Argumentos:   R1 - linha
+;               R2 - coluna
+;               R4 - tabela que define a mina
+; **********************************************************************
+desenha_mina:
 	PUSH R1
 	PUSH R2
 	PUSH R3
@@ -244,7 +209,32 @@ desenha_meteoro:
 	RET
 
 ;**********************************************************************
-; DESENHA_BONECO - Desenha um boneco na linha e coluna indicadas
+; APAGA_MINA - Apaga a mina na linha e coluna indicadas
+;			    com a forma e cor definidas na tabela indicada.
+; Argumentos:   R1 - linha
+;               R2 - coluna
+;               R4 - tabela que define o boneco
+; **********************************************************************
+apaga_mina:
+	PUSH R1
+	PUSH R2
+	PUSH R3
+	PUSH R4
+	PUSH R9
+	PUSH R10
+	MOV R1,R9
+	MOV R2,R10
+	MOV R4,R3
+	CALL apaga_boneco
+	POP R10
+	POP R9
+	POP R4
+	POP R3
+	POP R2
+	POP R1
+	RET
+;**********************************************************************
+; desenha_boneco - Desenha um boneco na linha e coluna indicadas
 ;			    com a forma e cor definidas na tabela indicada.
 ; Argumentos:   R1 - linha
 ;               R2 - coluna
@@ -297,25 +287,6 @@ desenha_pixels:       			; desenha os pixels do boneco a partir da tabela
 ;               R4 - tabela que define o boneco
 ;
 ; **********************************************************************
-apaga_meteoro:
-	PUSH R1
-	PUSH R2
-	PUSH R3
-	PUSH R4
-	PUSH R9
-	PUSH R10
-	MOV R1,R9
-	MOV R2,R10
-	MOV R4,R3
-	CALL apaga_boneco
-	POP R10
-	POP R9
-	POP R4
-	POP R3
-	POP R2
-	POP R1
-	RET
-
 apaga_boneco:
 	PUSH 	R1
 	PUSH	R2
@@ -354,8 +325,71 @@ apaga_pixels:       			; desenha os pixels do boneco a partir da tabela
 	POP R1
 	RET
 
+; **********************************************************************
+; DESCE MINA - Move a mina para a linha de baixo
+; Argumentos:  R9 - Linha da mina
+;			   R11 - Endereço do som
+;
+; **********************************************************************
+desce_mina:
+	CALL apaga_mina				; apaga a mina
+	PUSH R3
+	MOV R3, MAX_LINHA			; linha maxima onde a mina pode estar
+	CMP R3, R9					; ve se a mina esta na linha maxima
+	POP R3
+	JZ espera_mina				; se esta, nao desenha mais a mina
+	ADD R9, +1					; incrementa a linha da mina
+	PUSH R11
+	MOV	R11, 0					; som com número 0
+	MOV [TOCA_SOM], R11			; comando para tocar o som
+	POP R11
+	CALL desenha_mina			; desenha a mina
 
+espera_mina:	
+	MOV R6, LINHA_MOVE_MINA		; linha da tecla para desincrementar
+	CALL teclado				; leitura às teclas
+	CMP	R0, TECLA_METEORO 		; ve se a tecla ainda esta premida
+	JZ	espera_mina			;	 espera, enquanto a tecla esta premida
+	RET
 
+; **********************************************************************
+; INCREMENTACONTADOR - incrementa uma unidade ao contador
+; Argumentos:   R8 - Contador
+;				R5 - Endereço dos displays
+;
+; **********************************************************************
+
+incrementaContador:				; incrementa o contador por uma unidade e mete nos displays
+	ADD R8, 1					; incrementa uma unidade
+	MOV [R5], R8				; mete nos displays
+
+espera_incrementa:	
+	MOV R6, LINHA_CONTADOR      ; linha da tecla para incrementar
+	CALL teclado				; leitura às teclas
+	CMP	R0, TECLA_INCREMENTA	; verifica se a tecla ainda esta premida
+	JZ	espera_incrementa		; espera, enquanto houver tecla uma tecla premida
+	RET
+
+; **********************************************************************
+; DESINCREMENTACONTADOR - incrementa uma unidade ao contador
+; Argumentos:   R8 - Contador
+;				R5 - Endereço dos displays
+;
+; **********************************************************************
+
+desincrementaContador:			; desincrementa o contador por uma unidade e mete nos dispalys
+	SUB R8, 0					; testa se o contador é 0
+	JZ espera_desincrementa		; se for 0, vai esperar enquanto estiver a tecla premida
+	SUB R8, 1					; desincrementa uma unidade
+	MOV [R5], R8				; escreve no display
+
+espera_desincrementa:	
+	MOV R6, LINHA_CONTADOR		; linha da tecla para desincrementar
+	CALL teclado				; leitura às teclas
+	CMP	R0, TECLA_DESINCREMENTA ; ve se a tecla ainda esta premida
+	JZ	espera_desincrementa	; espera, enquanto a tecla esta premida
+	RET
+		
 ; **********************************************************************
 ; ESCREVE_PIXEL - Escreve um pixel na linha e coluna indicadas.
 ; Argumentos:   R1 - linha
@@ -378,8 +412,8 @@ escreve_pixel:
 atraso:
 	PUSH	R11
 ciclo_atraso:
-	SUB	R11, 1
-	JNZ	ciclo_atraso
+	SUB	R11, 1					; subtrai uma unidade ao atraso
+	JNZ	ciclo_atraso			; se o valor de atraso ainda nao for 0, repete
 	POP	R11
 	RET
 
@@ -442,7 +476,7 @@ no_tecla:
 	POP	R2
 	RET
 
- calcula_output:
+calcula_output:		   ; Calcula o valor da tecla premida (0 a F)
 	PUSH R5
 	PUSH R7
 	PUSH R8
