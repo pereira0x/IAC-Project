@@ -173,7 +173,9 @@ coluna_seguinte:
 
 incrementa:
 	CALL incrementaContador		; incrementa o contador e escreve nos displays
-	JMP espera_tecla			; ja nao ha tecla premida
+	JMP espera_tecla			; ja n   ; Obter o valor da tecla na tal coluna e linha
+    MUL R5, R8         ; Obter o valor da tecla na tal coluna e linha
+    ADD R5,R7          ; Obter o valor da tecla na tal coluna e linhaao ha tecla premida
 
 desincrementa:				
 	CALL desincrementaContador  ; desincrementa o contador e escreve nos displays
@@ -485,26 +487,26 @@ calcula_output:		   ; Calcula o valor da tecla premida (0 a F)
 	PUSH R11
     MOV  R9, R6        ; Numero da linha
     MOV  R11, R0       ; Numero da coluna
-    MOV R5,0           ; 	
-    MOV R7,0           ; 
-    MOV R8,1           ; 
+    MOV R5,0            	
+    MOV R7,0            
+    MOV R8,1            
 
-calcula_linha:         ;
+calcula_linha:         ; Conta qual a linha, a partir da 0
     SHR R9,1           ;
     ADD R5,R8          ; 
     CMP R9,0           ;
     JNZ calcula_linha  ;
     SUB R5,R8          ;
      
-calcula_coluna:        ;
-    SHR R11,1          ;
-    ADD R7,R8          ;
-    CMP R11,0          ;
-    JNZ calcula_coluna ;
-    SUB R7,R8          ;
-    MOV R8,4           ;
-    MUL R5, R8         ;
-    ADD R5,R7          ;
+calcula_coluna:        ; Conta qual a coluna, a partir da 0
+    SHR R11,1          
+    ADD R7,R8          
+    CMP R11,0          
+    JNZ calcula_coluna 
+    SUB R7,R8          
+    MOV R8,4           
+    MUL R5, R8         ; Multiplica por 4
+    ADD R5,R7          ; Obter o valor da tecla na tal coluna e linha
 
 	MOV R0, R5		   ; R0 vai ser o numero da tecla premida
 	POP R11
