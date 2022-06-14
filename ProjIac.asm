@@ -3,7 +3,7 @@
 ; * Disciplina: IAC
 ; * Versão:     Intermédia
 ; * Grupo:	    23
-; * Autores:    Henrique Dutra - 99234
+; * Autores:    
 ; *             José Pereira   - 103252
 ; *             Miguel Parece  - 103369 
 ; *
