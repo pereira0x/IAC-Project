@@ -364,7 +364,7 @@ espera_mina:
 
 incrementaContador:				; incrementa o contador por uma unidade e mete nos displays
 	ADD R8, 1					; incrementa uma unidade
-	MOV [R5], R8				; mete nos displays
+	MOV [R5], R8					; mete nos displays
 
 espera_incrementa:	
 	MOV R6, LINHA_CONTADOR      ; linha da tecla para incrementar

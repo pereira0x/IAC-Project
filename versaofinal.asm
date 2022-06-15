@@ -54,7 +54,13 @@ SP_inicial_teclado:		; este é o endereço com que o SP deste processo deve ser 
 						
 	STACK 100H			; espaço reservado para a pilha do processo "boneco"
 SP_inicial_boneco:		; este é o endereço com que o SP deste processo deve ser inicializado
-							
+
+
+BTE_START:
+	WORD 0
+	WORD 0
+	WORD decrementa_energia
+
 tecla_carregada:
 	LOCK  0				; LOCK para o teclado comunicar aos restantes processos que tecla detetou,
 						; uma vez por cada tecla carregada
@@ -73,14 +79,18 @@ DEF_BONECO:				; tabela que define o tubarão (cor, largura, pixels)
 	WORD  0F000H, 0F258H, 0FFFFH, 0F258H, 0F000H 
 	WORD  0F258H, 0FFFFH, 0FF00H, 0FFFFH, 0F258H
 	WORD  0FFFFH, 0FF00H, 0FB00H, 0FF00H, 0FFFFH
-     
-
+    
+ENERGIA: WORD 64H		; variavel global do valor da energia		
 ; *********************************************************************************
 ; * Código
 ; *********************************************************************************
-PLACE   0                     ; o código tem de começar em 0000H
+PLACE   0                   ; o código tem de começar em 0000H
+
 inicio:
-	MOV  SP, SP_inicial_prog_princ		; inicializa SP do programa principal
+	MOV  SP, SP_inicial_prog_princ	; inicializa SP do programa principal
+	MOV BTE, BTE_START
+	EI2						; permite interrupções 0
+	EI						; permite interrupções (geral)
                             
     MOV  [APAGA_AVISO], R1	; apaga o aviso de nenhum cenário selecionado (o valor de R1 não é relevante)
     MOV  [APAGA_ECRÃ], R1	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
@@ -93,22 +103,30 @@ inicio:
 	CALL  boneco			; cria o processo boneco
 
 	; o resto do programa principal é também um processo (neste caso, trata dos displays)
-
-	MOV  R2, 0				; valor do contador, cujo valor vai ser mostrado nos displays
+display_setup:
+	MOV  R2, [ENERGIA]		; valor do contador, cujo valor vai ser mostrado nos displays
 	MOV  R0, DISPLAYS       ; endereço do periférico que liga aos displays
-atualiza_display:	
-	MOVB  [R0], R2          ; mostra o valor do contador nos displays
-obtem_tecla:	
-	MOV  R1, [tecla_carregada]	; bloqueia neste LOCK até uma tecla ser carregada
-	CMP	 R1, TECLA_C		; é a coluna da tecla C?
-	JNZ	 testa_D
-	ADD  R2, 1              ; aumenta o contador
-	JMP	 atualiza_display
-testa_D:	
-	CMP	 R1, TECLA_D		; é a coluna da tecla D?
-	JNZ	 obtem_tecla		; se não, ignora a tecla e espera por outra
-	SUB  R2, 1              ; diminui o contador
-	JMP	 atualiza_display	; processo do programa principal nunca termina
+
+	MOV R5, 0				; valor da energia em decimal
+	MOV R4, 03E8H			; 1000 em decimal
+
+calcula_decimal:
+	MOV R3, R2				; valor inicial da energia
+	MOD R3, R4				; valor a converter
+	MOV R10, 000AH			; 10 em decimal
+	DIV R4, R10				; fator de divisão
+	CMP R4, 0
+	JZ atualiza_display
+	MOV R6, R3				; vamos calcular o digito
+	DIV R6, R4				; digito
+	SHL R5, 4				; mais um digito do valor decimal
+	OR R5, R6				; vai compondo o resultado
+	JMP calcula_decimal
+
+atualiza_display:
+	MOV  [R0], R5          ; mostra o valor do contador nos displays
+	YIELD	
+	JMP display_setup
 
 
 ; **********************************************************************
@@ -185,16 +203,16 @@ testa_mover_direita:
 
 testa_mover_esquerda:
 	MOV	 R3, [tecla_continuo]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
-	CMP	 R3, TECLA_F		; é a coluna da tecla E?
+	CMP	 R3, TECLA_F			; é a coluna da tecla E?
 	JZ  move_esquerda
-	JNZ	 espera_movimento	; se não é, ignora e continua à espera
+	JNZ	 espera_movimento		; se não é, ignora e continua à espera
 
 move_direita:
 
-	MOV	 R7, +1				; vai deslocar para a esquerda
+	MOV	 R7, +1				; vai deslocar para a direita
 	JMP  move
 move_esquerda:
-	MOV	 R7, -1
+	MOV	 R7, -1				; vai deslocar para a esquerda
 	JMP  move
 move:
 	SUB  R5, 1				; subtrai uma unidade ao atraso
@@ -235,7 +253,7 @@ desenha_boneco:
 	ADD	 R4, 2					; endereço da cor do 1º pixel (2 porque a largura é uma word)
 desenha_pixels:       			; desenha os pixels do boneco a partir da tabela
 	MOV	 R3, [R4]				; obtém a cor do próximo pixel do boneco
-	CALL  escreve_pixel		; escreve cada pixel do boneco
+	CALL  escreve_pixel			; escreve cada pixel do boneco
 	ADD	 R4, 2					; endereço da cor do próximo pixel (2 porque cada cor de pixel é uma word)
     ADD  R2, 1                  ; próxima coluna
     SUB  R5, 1					; menos uma coluna para tratar
@@ -352,3 +370,23 @@ sai_testa_limites:
 	POP	 R5
 	RET
 
+;
+; Interrupts
+;
+
+decrementa_energia:
+	PUSH R0
+	PUSH R1
+	PUSH R2
+
+	MOV R0, 14H				; Dividir um numero por 20 da 5%
+	MOV R1, [ENERGIA]		; ler o valor atual da energia
+	MOV R2, R1				; fazer uma copia desse valor
+	DIV R1, R0				; obter os 5% desse valor
+	SUB R2, R1				; subtrair do valor da energio os 5%
+	MOV [ENERGIA], R2		; escrever o novo valor atual da energia
+
+	POP R2
+	POP R1
+	POP R0
+	RFE
