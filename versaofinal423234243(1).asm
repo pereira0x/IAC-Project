@@ -129,6 +129,7 @@ evento_int_mina:
 
 
 
+
 DEF_MINA:						; tabela que define a mina (cor, largura, pixels)
 	WORD  LARGURA
 	WORD  ALTURA_MINA

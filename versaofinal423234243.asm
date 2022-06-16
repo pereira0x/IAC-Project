@@ -606,16 +606,12 @@ game_over:
 decrementa_energia:
 	PUSH R0
 	PUSH R1
-	PUSH R2
 
-	MOV R0, 14H				; Dividir um numero por 20 da 5%
-	MOV R1, [ENERGIA]		; ler o valor atual da energia
-	MOV R2, R1				; fazer uma copia desse valor
-	DIV R1, R0				; obter os 5% desse valor
-	SUB R2, R1				; subtrair do valor da energio os 5%
-	MOV [ENERGIA], R2		; escrever o novo valor atual da energia
+	MOV R0, 3
+	MOV R1, [ENERGIA]
+	SUB R1, R0
+	MOV [ENERGIA], R1
 
-	POP R2
 	POP R1
 	POP R0
 	RFE

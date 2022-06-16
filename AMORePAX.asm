@@ -65,6 +65,7 @@ DECIMAL_1000	EQU 03E8H		; numero 1000
 MAX_MINAS		EQU 4			; numero maximo de minas em tela
 DECREMENTA_ENERGIA_VALOR EQU 5  ; valor a decrementar à energia
 DECREMENTA_MISSIL_VALOR EQU 5  ; valor a decrementar à energia
+DECREMENTA_ENERGIA_VALOR_XL EQU 10
 
 
 ; *********************************************************************************
@@ -120,7 +121,11 @@ posicao_missil:				; posicao inicial do missil
 
 posicao_tubarao:			; posicao incial do tubarão
 	WORD LINHA
-	WORD COLUNA				 
+	WORD COLUNA
+
+posicao_explosao:			; posicao incial do tubarão
+	WORD 200
+	WORD 200			 
 
 minaSP_tab:					; varias instancias das minas
 	WORD	SP_inicial_mina0
@@ -155,6 +160,9 @@ evento_int_0:
 
 evento_int_energia:
 	LOCK 0				; LOCK para a rotina de interrupção comunicar que a interrupção ocorreu
+
+
+
 
 
 DEF_MINA1:						; tabela que define a mina (cor, largura, pixels)
@@ -281,8 +289,20 @@ DEF_BONECO:				; tabela que define otubarão (cor, largura, pixels)
 	WORD  0F000H, 0F258H, 0FFFFH, 0F258H, 0F000H 
 	WORD  0F258H, 0FFFFH, 0FF00H, 0FFFFH, 0F258H
 	WORD  0FFFFH, 0FF00H, 0FB00H, 0FF00H, 0FFFFH
+	
 
+DEF_EXPLOSAO:
+	WORD  LARGURA
+	WORD  6
+WORD    0, 0FF62H, 0FFA1H, 0FF62H, 0
+WORD    0FF62H, 0FFA1H, 0FFA1H, 0FFA1H, 0FF62H
+WORD    0FFA1H, 0FFA1H, 0FFFFH, 0FFA1H, 0FFA1H
+WORD    0FF62H, 0FFA1H, 0FFA1H, 0FFA1H, 0FF62H
+WORD    0, 0FF62H, 0FFA1H, 0FF62H, 0, 0
+WORD	0,0,0,0,0
 
+TABELA_EXPLOSAO:
+	WORD DEF_EXPLOSAO
 
 DEF_MISSIL:
 	WORD 1
@@ -292,7 +312,7 @@ DEF_MISSIL:
 
 ENERGIA: WORD 64H		; variavel global do valor da energia	
 PAUSADO: WORD 0
-HOMESCREEN: WORD 0
+POSICAO_EXPLOSAO: WORD 0
 ; *********************************************************************************
 ; * Código
 ; *********************************************************************************
@@ -305,7 +325,7 @@ inicio:
 	EI1
 	EI2					; permite interrupções 2
 					; permite interrupções (geral)
-
+                            
     MOV  [APAGA_AVISO], R1	; apaga o aviso de nenhum cenário selecionado (o valor de R1 não é relevante)
     MOV  [APAGA_ECRÃ], R1	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
 	MOV	 R1, 0				; cenário de fundo número 0
@@ -313,6 +333,7 @@ inicio:
 	MOV	 R7, 1				; valor a somar à coluna do boneco, para o movimentar
      
 	; cria processos. O CALL não invoca a rotina, apenas cria um processo executável
+	CALL  teclado			; cria o processo teclado
 	CALL  boneco			; cria o processo boneco
 	CALL missil
 	CALL energia
@@ -348,11 +369,6 @@ calcula_decimal:
 	JMP calcula_decimal
 
 atualiza_display:
-		YIELD
-	MOV R9, [HOMESCREEN]
-	MOV R11, 0
-	CMP R11, R9
-	JNZ atualiza_display
 	MOV R8, [PAUSADO]
 	MOV R10, 0
 	CMP R8, R10
@@ -360,6 +376,7 @@ atualiza_display:
 	EI
 checkpoint1:	
 	MOV  [R0], R5          ; mostra o valor do contador nos displays
+	YIELD
 	JMP display_setup
 
 pausame:
@@ -371,16 +388,17 @@ pausame:
 
 PROCESS SP_inicial_pausa
 pausa:
+	MOV R1, 04AFH
+tempo:
 	YIELD
+	
+	SUB R1, 1
+	JNZ tempo
 	MOV R10, 0
 	MOV	 R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
 	MOV R11, [tecla_continuo]
 	CMP R11, 0
 	JZ pausa
-	MOV R9,TECLA_3
-	CMP R3, R9
-	JZ primeira_vez
-	CMP	 R3, R9			; é a coluna da tecla 1?
 	MOV R9,TECLA_1
 	CMP	 R3, R9			; é a coluna da tecla 1?
 	JNZ pausa
@@ -394,18 +412,17 @@ pausa:
 		MOV	 R1, 3				; cenário de fundo número 0
 		MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
 		JMP pausa
-	primeira_vez:
-		MOV R4, [HOMESCREEN]
-		CMP R4, 0
-		JNZ  pausa
 	reseta:
 		MOV R10, 0
 		MOV [PAUSADO], R10
 		MOV  [APAGA_ECRÃ], R4	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
 		MOV	 R1, 0				; cenário de fundo número 0
 		MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+		MOV  R1, [posicao_tubarao]			; linha do boneco
+		MOV	 R2, [posicao_tubarao+2]
+		MOV	 R4, DEF_BONECO		; endereço da tabela que define o boneco
+		CALL desenha_boneco
 		JMP pausa
-
 
 
 ; **********************************************************************
@@ -808,6 +825,17 @@ testa_colisao_missil:
 	MOV R9,0
 	MOV [TOCA_SOM],R9
 	CALL incrementa_energia
+		; explode me
+	MOV R4, [TABELA_EXPLOSAO]
+	MOV[posicao_explosao], R1
+	MOV [posicao_explosao+2], R2
+	CALL desenha_mina
+	MOV R10, 0FFFH
+BACK1:
+	YIELD
+	SUB R10, 1
+	JNZ BACK
+	CALL apaga_mina
 	JMP mina
 	
 	
@@ -932,8 +960,18 @@ testa_colisao_missil_peixe:
 	JGT verifica_colisao_tubarao_peixe
 	MOV R9,0
 	MOV [TOCA_SOM],R9
-	CALL incrementa_energia
-	JMP peixe
+	; explode me
+	MOV R4, [TABELA_EXPLOSAO]
+	MOV[posicao_explosao], R1
+	MOV [posicao_explosao+2], R2
+	CALL desenha_mina
+	MOV R10, 0FFFH
+BACK:
+	YIELD
+	SUB R10, 1
+	JNZ BACK
+	CALL apaga_mina
+	JMP mina
 	
 	
 
@@ -958,7 +996,8 @@ verifica_colisao_tubarao_peixe:
 	ADD R10,5
 	CMP R8,R10
 	JGT ciclo_peixe
-	JMP game_over
+	CALL incrementa_energiaOP
+	JMP mina
 
 
 	
@@ -1105,6 +1144,21 @@ incrementa_energia:
 	POP R1
 	POP R0
 	RET
+
+
+incrementa_energiaOP:
+	PUSH R0
+	PUSH R1
+
+	MOV R0, DECREMENTA_ENERGIA_VALOR_XL	; valor a decrementar
+	MOV R1, [ENERGIA]		; leitura do valora atual da energia
+	ADD R1, R0				; subtrai o valor a decrementar
+	MOV [ENERGIA], R1		; escreve o novo valor da energia
+
+	POP R1
+	POP R0
+	RET
+
 desincrementa_energia:
 	PUSH R0
 	PUSH R1
@@ -1117,6 +1171,8 @@ desincrementa_energia:
 	POP R1
 	POP R0
 	RET
+
+
 ;
 ; Interrupts
 ;
