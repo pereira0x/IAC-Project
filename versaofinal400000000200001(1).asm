@@ -34,6 +34,11 @@ LINHA_TECLADO	EQU 8		   ; linha a testar (4ª linha, 1000b)
 MASCARA			EQU	0FH		   ; para isolar os 4 bits de menor peso, ao ler as colunas do teclado
 MASK 			EQU 0FFH	   ; para isolar os 8 bits de menor peso
 
+TECLA_1			EQU 1
+TECLA_2			EQU 2
+TECLA_3			EQU 3
+
+
 TECLA_C			EQU 0CH		   ; tecla na terceira coluna do teclado (tecla C)
 TECLA_D			EQU 0DH	       ; tecla na segunda coluna do teclado (tecla D)
 TECLA_E			EQU 0EH		   ; tecla na terceira coluna do teclado (tecla E)
@@ -59,7 +64,7 @@ DECIMAL_10		EQU 000AH       ; numero 10
 DECIMAL_1000	EQU 03E8H		; numero 1000
 MAX_MINAS		EQU 4			; numero maximo de minas em tela
 DECREMENTA_ENERGIA_VALOR EQU 5  ; valor a decrementar à energia
-DECREMENTA_MISSIL_VALOR EQU 0AH  ; valor a decrementar à energia
+DECREMENTA_MISSIL_VALOR EQU 5  ; valor a decrementar à energia
 
 
 ; *********************************************************************************
@@ -82,6 +87,9 @@ SP_inicial_missil:		; este é o endereço com que o SP deste processo deve ser i
 
 	STACK 100H			; espaço reservado para a pilha do processo "energia"
 SP_inicial_energia:		; este é o endereço com que o SP deste processo deve ser inicializado
+
+	STACK 100H			; espaço reservado para a pilha do processo "energia"
+SP_inicial_pausa:		; este é o endereço com que o SP deste processo deve ser inicializado
 
 ; SP inicial de cada processo "mina"
 	STACK 100H			; espaço reservado para a pilha do processo "mina", instância 0
@@ -286,6 +294,7 @@ DEF_MISSIL:
 
 
 ENERGIA: WORD 64H		; variavel global do valor da energia	
+PAUSADO: WORD 0
 ; *********************************************************************************
 ; * Código
 ; *********************************************************************************
@@ -297,7 +306,7 @@ inicio:
 	EI0					; permite interrupções 0
 	EI1
 	EI2					; permite interrupções 2
-	EI					; permite interrupções (geral)
+					; permite interrupções (geral)
                             
     MOV  [APAGA_AVISO], R1	; apaga o aviso de nenhum cenário selecionado (o valor de R1 não é relevante)
     MOV  [APAGA_ECRÃ], R1	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
@@ -310,6 +319,7 @@ inicio:
 	CALL  boneco			; cria o processo boneco
 	CALL missil
 	CALL energia
+	CALL pausa
 	MOV R11, MAX_MINAS
 	loop_bonecos:
 	SUB	R11, 1			; próximo boneco
@@ -341,9 +351,51 @@ calcula_decimal:
 	JMP calcula_decimal
 
 atualiza_display:
+	MOV R8, [PAUSADO]
+	MOV R10, 0
+	CMP R8, R10
+	JNZ pausame
+	EI
+checkpoint1:	
 	MOV  [R0], R5          ; mostra o valor do contador nos displays
-	YIELD	
+	YIELD
 	JMP display_setup
+
+pausame:
+	DI
+	JMP checkpoint1
+
+
+
+
+PROCESS SP_inicial_pausa
+pausa:
+	YIELD
+	MOV R10, 0
+	MOV	 R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
+	MOV R11, [tecla_continuo]
+	CMP R11, 0
+	JZ pausa
+	MOV R9,TECLA_1
+	CMP	 R3, R9			; é a coluna da tecla 1?
+	JNZ pausa
+	MOV R8, [PAUSADO]
+	CMP R8, R10
+	JNZ reseta
+	troca_para_pausa:
+		MOV R10, 1
+		MOV [PAUSADO], R10
+		MOV  [APAGA_ECRÃ], R4	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
+		MOV	 R1, 3				; cenário de fundo número 0
+		MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+		JMP pausa
+	reseta:
+		MOV R10, 0
+		MOV [PAUSADO], R10
+		MOV  [APAGA_ECRÃ], R4	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
+		MOV	 R1, 0				; cenário de fundo número 0
+		MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+		JMP pausa
 
 
 ; **********************************************************************
@@ -356,7 +408,8 @@ atualiza_display:
 
 PROCESS SP_inicial_teclado	; indicação de que a rotina que se segue é um processo,
 							; com indicação do valor para inicializar o SP
-teclado:					; processo que implementa o comportamento do teclado
+teclado:
+DI					; processo que implementa o comportamento do teclado
 	MOV  R2, TEC_LIN		; endereço do periférico das linhas
 	MOV  R3, TEC_COL		; endereço do periférico das colunas
 	MOV  R5, MASCARA		; para isolar os 4 bits de menor peso, ao ler as colunas do teclado
@@ -412,6 +465,7 @@ ha_tecla:				; neste ciclo espera-se até NENHUMA tecla estar premida
 PROCESS SP_inicial_energia
 	
 	energia:
+		DI
 		YIELD
 		MOV	R0,[evento_int_energia]
 		MOV R0,[ENERGIA]
@@ -421,7 +475,9 @@ PROCESS SP_inicial_energia
 		JMP energia
 		parar:
 		CALL game_over
-		; **********************************************************************
+
+
+; **********************************************************************
 ; Processo
 ;
 ; BONECO - Processo que desenha um boneco e o move horizontalmente, com
@@ -431,7 +487,8 @@ PROCESS SP_inicial_energia
 
 PROCESS SP_inicial_boneco	; indicação de que a rotina que se segue é um processo,
 							; com indicação do valor para inicializar o SP
-boneco:						; processo que implementa o comportamento do boneco
+boneco:
+	DI						; processo que implementa o comportamento do boneco
 	; desenha o boneco na sua posição inicial
     MOV  R1, LINHA			; linha do boneco
 	MOV	 R2, COLUNA
@@ -643,8 +700,8 @@ PROCESS SP_inicial_mina0
 
 mina:
 	CALL rand
-	CMP R4, 5
-	JGT peixe
+	CMP R4, 3
+	JLT peixe
 	MOV  R10, R11			; cópia do nº de instância do processo
 	SHL  R10, 1			; multiplica por 2 porque as tabelas são de WORDS
 	MOV  R9, minaSP_tab	; tabela com os SPs iniciais das várias instâncias deste processo
