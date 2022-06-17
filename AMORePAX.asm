@@ -63,6 +63,7 @@ MAX_COLUNA		EQU 63         ; número da coluna mais à direita que o objeto pode
 MAX_LINHA 		EQU 31		   ; número da linha mais a baixo que a mina pode ocupar.
 
 DECIMAL_10		EQU 000AH      ; numero 10 em hexadecimal
+DECIMAL_100		EQU 64H        ; numero 100 em hexadecimal
 DECIMAL_1000	EQU 03E8H	   ; numero 1000 em hexadecimal
 
 MAX_OBJETOS		EQU 4		   ; numero maximo de minas em tela
@@ -326,7 +327,7 @@ DEF_MISSIL:					; tabela que define o missil
 	WORD 0FB00H
 
 
-ENERGIA: WORD 64H			; variavel global do valor da energia	
+ENERGIA: WORD DECIMAL_100			; variavel global do valor da energia	
 PAUSADO: WORD 0				; variavel global para verificar se o jogo esta em pausa
 POSICAO_EXPLOSAO: WORD 0	; variavel global 
 ; *********************************************************************************
@@ -1184,15 +1185,28 @@ rand:
 incrementa_energia:
 	PUSH R0
 	PUSH R1
+	PUSH R2
 
 	MOV R0, ENERGIA_VALOR	; valor a incrementar
 	MOV R1, [ENERGIA]		; leitura do valora atual da energia
-	ADD R1, R0				; subtrai o valor a decrementar
+	ADD R1, R0				; adiciona o valor a incrementar
+	MOV R2, DECIMAL_100		; 100 em hexadecimal
+	CMP R1, R2				; ve se a energia ficava mais que 100
+	JGT max_100				; se sim, limite a 100
 	MOV [ENERGIA], R1		; escreve o novo valor da energia
 
+	PUSH R2
 	POP R1
 	POP R0
 	RET
+
+max_100:
+	MOV [ENERGIA], R2		; mete energia a 100
+	POP R2
+	POP R1
+	POP R0
+	RET
+
 
 ; **********************************************************************
 ; incrementa_energia_peixe - aumenta a energia quando um peixe é comido
@@ -1200,12 +1214,24 @@ incrementa_energia:
 incrementa_energia_peixe:
 	PUSH R0
 	PUSH R1
+	PUSH R2
 
-	MOV R0, ENERGIA_VALOR_XL	; valor a incrementar
+	MOV R0, ENERGIA_VALOR_XL; valor a incrementar
 	MOV R1, [ENERGIA]		; leitura do valora atual da energia
-	ADD R1, R0				; subtrai o valor a decrementar
+	ADD R1, R0				; adiciona o valor a incrementar
+	MOV R2, DECIMAL_100		; 100 em hexadecimal
+	CMP R1, R2				; ve se a energia ficava mais que 100
+	JGT max100				; se sim, limite a 100
 	MOV [ENERGIA], R1		; escreve o novo valor da energia
 
+	POP R2
+	POP R1
+	POP R0
+	RET
+
+max100:
+	MOV [ENERGIA], R2		; mete energia a 100
+	POP R2
 	POP R1
 	POP R0
 	RET
