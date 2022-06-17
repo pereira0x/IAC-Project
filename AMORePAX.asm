@@ -3,7 +3,7 @@
 ; * Disciplina: IAC
 ; * Versão:     Intermédia
 ; * Grupo:	    23
-; * Autores:    Henrique Dutra - 
+; * Autores:    Henrique Dutra - 99234
 ; *             José Pereira   - 103252
 ; *             Miguel Parece  - 103369 
 ; *
@@ -12,6 +12,9 @@
 ; *********************************************************************
 ; Instruções:
 ; Teclas:
+;	- 1 : Pausar/Continuar o jogo
+;	- 2 : terminar o jogo
+;	- 3 : Começar/Recomecar o jogo
 ;	- C : Dispara missil
 ;	- D : Movimentar o tubarão para a esquerda
 ;	- E : Movimentar o tubarão para a direita
@@ -25,47 +28,47 @@ DEFINE_COLUNA   EQU 600CH      ; endereço do comando para definir a coluna
 DEFINE_PIXEL   	EQU 6012H      ; endereço do comando para escrever um pixel
 APAGA_AVISO    	EQU 6040H      ; endereço do comando para apagar o aviso de nenhum cenário selecionado
 APAGA_ECRÃ		EQU 6002H      ; endereço do comando para apagar todos os pixels já desenhados
-SELECIONA_CENARIO_FUNDO  EQU 6042H      ; endereço do comando para selecionar uma imagem de fundo
+SELECIONA_CENARIO_FUNDO  EQU 6042H  ; endereço do comando para selecionar uma imagem de fundo
 
 DISPLAYS		EQU 0A000H	   ; endereço do periférico que liga aos displays
 TEC_LIN			EQU 0C000H	   ; endereço das linhas do teclado (periférico POUT-2)
 TEC_COL			EQU 0E000H	   ; endereço das colunas do teclado (periférico PIN)
-LINHA_TECLADO	EQU 8		   ; linha a testar (4ª linha, 1000b)
+LINHA_TECLADO	EQU 8		   ; primeira linha a testar (4ª linha, 1000b)
 MASCARA			EQU	0FH		   ; para isolar os 4 bits de menor peso, ao ler as colunas do teclado
 MASK 			EQU 0FFH	   ; para isolar os 8 bits de menor peso
 
-TECLA_1			EQU 1
-TECLA_2			EQU 2
-TECLA_3			EQU 3
-
-
-TECLA_C			EQU 0CH		   ; tecla na terceira coluna do teclado (tecla C)
-TECLA_D			EQU 0DH	       ; tecla na segunda coluna do teclado (tecla D)
-TECLA_E			EQU 0EH		   ; tecla na terceira coluna do teclado (tecla E)
-TECLA_F			EQU 0FH		   ; tecla na terceira coluna do teclado (tecla F)
+TECLA_1			EQU 1		   ; tecla 1 do teclado
+TECLA_2			EQU 2		   ; tecla 2 do teclado
+TECLA_3			EQU 3		   ; tecla 3 do teclado
+TECLA_C			EQU 0CH		   ; tecla C do teclado
+TECLA_D			EQU 0DH	       ; tecla D do teclado
+TECLA_E			EQU 0EH		   ; tecla E do teclado
 
 TOCA_SOM		EQU 605AH      ; endereço do comando para tocar um som
 
-LARGURA			EQU	5	       ; largura do tubarão e da mina
-ALTURA_TUBARAO	EQU 4	       ; altura do tubarã
-LINHA        	EQU 27         ; linha do boneco (no fim do ecrâ))
-COLUNA			EQU 30         ; coluna do boneco (no fim do ecrã)
+LARGURA			EQU	5	       ; largura dos objetos
+ALTURA			EQU 5	 	   ; Altura da dos objetos
+
+ALTURA_EXPLOSAO EQU 6          ; altura da explosão
+ALTURA_TUBARAO	EQU 4	       ; altura do tubarao
+LINHA        	EQU 27         ; linha do tubarao (no fim do ecrâ))
+COLUNA			EQU 30         ; coluna do tubarao (no fim do ecrã)
 
 LINHA_MINA      EQU 0 	   	   ; linha da mina
 COLUNA_MINA		EQU 10         ; coluna da mina
-ALTURA_MINA		EQU 5	 	   ; Altura da mina
 
 MIN_COLUNA		EQU 0		   ; número da coluna mais à esquerda que o objeto pode ocupar
 MAX_COLUNA		EQU 63         ; número da coluna mais à direita que o objeto pode ocupar
 
-MAX_LINHA 		EQU 31			; número da linha mais a baixo que a mina pode ocupar.
+MAX_LINHA 		EQU 31		   ; número da linha mais a baixo que a mina pode ocupar.
 
-DECIMAL_10		EQU 000AH       ; numero 10
-DECIMAL_1000	EQU 03E8H		; numero 1000
-MAX_MINAS		EQU 4			; numero maximo de minas em tela
-DECREMENTA_ENERGIA_VALOR EQU 5  ; valor a decrementar à energia
-DECREMENTA_MISSIL_VALOR EQU 5  ; valor a decrementar à energia
-DECREMENTA_ENERGIA_VALOR_XL EQU 10
+DECIMAL_10		EQU 000AH      ; numero 10 em hexadecimal
+DECIMAL_1000	EQU 03E8H	   ; numero 1000 em hexadecimal
+
+MAX_OBJETOS		EQU 4		   ; numero maximo de minas em tela
+DECREMENTA_ENERGIA_VALOR EQU 5 ; valor a decrementar à energia
+DECREMENTA_MISSIL_VALOR  EQU 5 ; valor a decrementar à energia quando um missil destroi uma mina
+DECREMENTA_ENERGIA_VALOR_XL EQU 10 ; valor a decrementar à energia quando o tubarao come um peixeç
 
 
 ; *********************************************************************************
@@ -75,63 +78,66 @@ DECREMENTA_ENERGIA_VALOR_XL EQU 10
 
 ; Reserva do espaço para as pilhas dos processos
 	STACK 100H			; espaço reservado para a pilha do processo "programa principal"
-SP_inicial_prog_princ:	; este é o endereço com que o SP deste processo deve ser inicializado
+SP_inicial_prog_princ:
 							
 	STACK 100H			; espaço reservado para a pilha do processo "teclado"
-SP_inicial_teclado:		; este é o endereço com que o SP deste processo deve ser inicializado
+SP_inicial_teclado:	
 						
 	STACK 100H			; espaço reservado para a pilha do processo "boneco"
-SP_inicial_boneco:		; este é o endereço com que o SP deste processo deve ser inicializado
+SP_inicial_boneco:	
 
 	STACK 100H			; espaço reservado para a pilha do processo "missil"
-SP_inicial_missil:		; este é o endereço com que o SP deste processo deve ser inicializado
+SP_inicial_missil:		
 
 	STACK 100H			; espaço reservado para a pilha do processo "energia"
-SP_inicial_energia:		; este é o endereço com que o SP deste processo deve ser inicializado
+SP_inicial_energia:		
 
-	STACK 100H			; espaço reservado para a pilha do processo "energia"
-SP_inicial_pausa:		; este é o endereço com que o SP deste processo deve ser inicializado
+	STACK 100H			; espaço reservado para a pilha do processo "pausa"
+SP_inicial_pausa:		
+
+	STACK 100H			; espaço reservado para a pilha do processo "fim"
+SP_inicial_fim:		
 
 ; SP inicial de cada processo "mina"
 	STACK 100H			; espaço reservado para a pilha do processo "mina", instância 0
-SP_inicial_mina0:		; este é o endereço com que o SP deste processo deve ser inicializado
+SP_inicial_objeto0:		
 	STACK 100H			; espaço reservado para a pilha do processo "mina", instância 1
-SP_inicial_mina1:		; este é o endereço com que o SP deste processo deve ser inicializado
+SP_inicial_objeto1:		
 	STACK 100H			; espaço reservado para a pilha do processo "mina", instância 2
-SP_inicial_mina2:		; este é o endereço com que o SP deste processo deve ser inicializado
+SP_inicial_objeto2:		
 	STACK 100H			; espaço reservado para a pilha do processo "mina", instância 3
-SP_inicial_mina3:		; este é o endereço com que o SP deste processo deve ser inicializado
+SP_inicial_objeto3:		
 
 
-linha_minas:				; linha em que cada mina está (inicializada com a linha inicial)
+linha_minas:			; linha em que cada mina está
 	WORD 0
 	WORD 0
 	WORD 0
 	WORD 0
                               
-coluna_minas:				; colunas iniciais em que cada mina está
+coluna_minas:			; colunas iniciais em que cada mina está
 	WORD 5
 	WORD 15
 	WORD 24
 	WORD 46
 
-posicao_missil:				; posicao inicial do missil
+posicao_missil:			; posicao inicial do missil
 	WORD 200
 	WORD 200
 
-posicao_tubarao:			; posicao incial do tubarão
+posicao_tubarao:		; posicao incial do tubarão
 	WORD LINHA
 	WORD COLUNA
 
-posicao_explosao:			; posicao incial do tubarão
+posicao_explosao:		; posicao incial da explosao
 	WORD 200
 	WORD 200			 
 
-minaSP_tab:					; varias instancias das minas
-	WORD	SP_inicial_mina0
-	WORD	SP_inicial_mina1
-	WORD	SP_inicial_mina2
-	WORD	SP_inicial_mina3
+objetosSP_tab:				; varias instancias dos objetos
+	WORD SP_inicial_objeto0
+	WORD SP_inicial_objeto1
+	WORD SP_inicial_objeto2
+	WORD SP_inicial_objeto3
 
 
 
@@ -142,11 +148,11 @@ BTE_START:
 	WORD 0
 
 tecla_carregada:
-	LOCK  0				; LOCK para o teclado comunicar aos restantes processos que tecla detetou,
+	LOCK 0				; LOCK para o teclado comunicar aos restantes processos que tecla detetou,
 						; uma vez por cada tecla carregada
 							
 tecla_continuo:
-	LOCK  0				; LOCK para o teclado comunicar aos restantes processos que tecla detetou,
+	LOCK 0				; LOCK para o teclado comunicar aos restantes processos que tecla detetou,
 						; enquanto a tecla estiver carregada
 
 mina_anda:				; LOCK para a rotina de interrupção comunicar ao processo desce minas que 
@@ -156,125 +162,126 @@ missil_anda:			; LOCK para a rotina de interrupção comunicar ao processo do mi
 	LOCK 0				; é para disparar
 
 evento_int_0:
-	LOCK  0				; LOCK para a rotina de interrupção comunicar ao processo boneco que a interrupção ocorreu
+	LOCK 0				; LOCK para a rotina de interrupção comunicar ao processo boneco que a interrupção ocorreu
 
 evento_int_energia:
-	LOCK 0				; LOCK para a rotina de interrupção comunicar que a interrupção ocorreu
+	LOCK 0				; LOCK para a rotina de interrupção comunicar que a interrupção ocorreu e
+						; desce a energia
 
 
 
 
 
-DEF_MINA1:						; tabela que define a mina (cor, largura, pixels)
-	WORD  LARGURA
-	WORD  ALTURA_MINA
-	WORD    0A000H, 0,0,0,0
-	WORD    0, 0,0,0,0
-	WORD 	0,0,0,0, 0
-	WORD  	0,0, 0, 0, 0
-	WORD   	0,0, 0, 0, 0
-	WORD  	0, 0, 0, 0, 0
-
-DEF_MINA2:						; tabela que define a mina (cor, largura, pixels)
-	WORD  LARGURA
-	WORD  ALTURA_MINA
-	WORD    0A000H, 0A000H,0,0,0
-	WORD    0A000H, 0A000H,0,0,0
-	WORD 	0,0,0,0, 0
-	WORD  	0,0, 0, 0, 0
-	WORD   	0,0, 0, 0, 0
-	WORD  	0, 0, 0, 0, 0
-
-DEF_MINA3:						; tabela que define a mina (cor, largura, pixels)
-	WORD  LARGURA
-	WORD  ALTURA_MINA
-	WORD 	0A000H, 0, 0A000H,0,0
-	WORD    0, 0FF00H, 0,0,0
-	WORD    0A000H, 0, 0A000H,0,0
-	WORD  0,0,  0, 0, 0
-	WORD   0,0, 0, 0, 0
-	WORD  0, 0, 0, 0, 0
-DEF_MINA4:
+DEF_MINA1:						; tabela que define a mina1
 	WORD LARGURA
-	WORD ALTURA_MINA
-	WORD    0F000H, 0, 0, 0F000H,0
-	WORD    0, 0F000H, 0F000H, 0,0
-	WORD    0, 0F000H, 0F000H, 0,0
-	WORD    0F000H, 0, 0, 0F000H,0
-	WORD   0,0, 0, 0, 0
-	WORD  0, 0, 0, 0, 0
-DEF_MINA5:						; tabela que define a mina (cor, largura, pixels)
-	WORD  LARGURA
-	WORD  ALTURA_MINA
-	WORD  0F000H, 0, 0A000H, 0, 0F000H
-	WORD  0, 0F000H, 0F000H, 0F000H, 0
-	WORD  0A000H, 0F000H, 0FF00H, 0F000H, 0A000H
-	WORD  0, 0F000H, 0F000H, 0F000H, 0
-	WORD  0F000H, 0, 0A000H, 0, 0F000H
-	WORD  0,0,0,0,0
+	WORD ALTURA
+	WORD 0A000H, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+
+DEF_MINA2:						; tabela que define a mina2 
+	WORD LARGURA
+	WORD ALTURA
+	WORD 0A000H, 0A000H, 0, 0, 0
+	WORD 0A000H, 0A000H, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+
+DEF_MINA3:						; tabela que define a mina3
+	WORD LARGURA
+	WORD ALTURA
+	WORD 0A000H, 0, 0A000H, 0, 0
+	WORD 0, 0FF00H, 0,0,0
+	WORD 0A000H, 0, 0A000H, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+DEF_MINA4:						; tabela que define a mina4´
+	WORD LARGURA
+	WORD ALTURA
+	WORD 0F000H, 0, 0, 0F000H, 0
+	WORD 0, 0F000H, 0F000H, 0, 0
+	WORD 0, 0F000H, 0F000H, 0, 0
+	WORD 0F000H, 0, 0, 0F000H, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+DEF_MINA5:						; tabela que define a mina5
+	WORD LARGURA
+	WORD ALTURA
+	WORD 0F000H, 0, 0A000H, 0, 0F000H
+	WORD 0, 0F000H, 0F000H, 0F000H, 0
+	WORD 0A000H, 0F000H, 0FF00H, 0F000H, 0A000H
+	WORD 0, 0F000H, 0F000H, 0F000H, 0
+	WORD 0F000H, 0, 0A000H, 0, 0F000H
+	WORD 0, 0, 0, 0, 0
 
 
 
 
-DEF_PEIXE1:						; tabela que define a mina (cor, largura, pixels)
-	WORD  LARGURA
-	WORD  ALTURA_MINA
-	WORD    0A000H, 0,0,0,0
-	WORD    0, 0,0,0,0
-	WORD 	0,0,0,0, 0
-	WORD  	0,0, 0, 0, 0
-	WORD   	0,0, 0, 0, 0
-	WORD  	0, 0, 0, 0, 0
+DEF_PEIXE1:						; tabela que define o peixe1
+	WORD LARGURA
+	WORD ALTURA
+	WORD 0A000H, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
 
 
-DEF_PEIXE2:						; tabela que define a mina (cor, largura, pixels)
-	WORD  LARGURA
-	WORD  ALTURA_MINA
-	WORD    0A000H, 0A000H,0,0,0
-	WORD    0A000H, 0A000H,0,0,0
-	WORD 	0,0,0,0, 0
-	WORD  	0,0, 0, 0, 0
-	WORD   	0,0, 0, 0, 0
-	WORD  	0, 0, 0, 0, 0
+DEF_PEIXE2:						; tabela que define o peixe2
+	WORD LARGURA
+	WORD ALTURA
+	WORD 0A000H, 0A000H, 0, 0, 0
+	WORD 0A000H, 0A000H, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
+	WORD 0, 0, 0, 0, 0
 
 
-DEF_PEIXE3:
-	WORD  LARGURA
-	WORD  ALTURA_MINA
-	WORD    0FF62H, 0, 0FF62H,0,0
-	WORD    0, 0FF62H, 0,0,0
-	WORD    0F000H, 0FF62H, 0F000H,0,0
-	WORD   0,0, 0, 0, 0
-	WORD   0,0, 0, 0, 0	
-	WORD   0,0, 0, 0, 0
+DEF_PEIXE3:     				; tabela que define o peixe3
+	WORD LARGURA
+	WORD ALTURA
+	WORD 0FF62H, 0, 0FF62H, 0, 0
+	WORD 0, 0FF62H, 0, 0, 0
+	WORD 0F000H, 0FF62H, 0F000H, 0, 0
+	WORD 0,0, 0, 0, 0
+	WORD 0,0, 0, 0, 0	
+	WORD 0,0, 0, 0, 0
 
-DEF_PEIXE4:
-	WORD  LARGURA
-	WORD  ALTURA_MINA
-	WORD    0FF62H, 0, 0, 0FF62H,0
-	WORD    0, 0FF62H, 0FF62H, 0,0
-	WORD    0FF62H, 0FF62H, 0FF62H, 0FF62H,0
-	WORD    0F000H, 0FF62H, 0FF62H, 0F000H,0
-	WORD   0,0, 0, 0,0	
-	WORD   0,0, 0, 0,0
+DEF_PEIXE4:     				; tabela que define o peixe4 (
+	WORD LARGURA
+	WORD ALTURA
+	WORD 0FF62H, 0, 0, 0FF62H, 0
+	WORD 0, 0FF62H, 0FF62H, 0, 0
+	WORD 0FF62H, 0FF62H, 0FF62H, 0FF62H, 0
+	WORD 0F000H, 0FF62H, 0FF62H, 0F000H, 0
+	WORD 0, 0, 0, 0, 0	
+	WORD 0, 0, 0, 0, 0
 
-DEF_PEIXE5:
-	WORD  LARGURA
-	WORD  ALTURA_MINA
-	WORD    0, 0FF62H, 0,0, 0FF62H 
-	WORD    0, 0, 0FF62H, 0FF62H, 0
-	WORD    0, 0, 0FF62H, 0FF62H, 0
-	WORD    0,0FF62H,  0FF62H, 0FF62H, 0FF62H
-	WORD    0, 0F000H,  0FF62H, 0FF62H, 0F000H
+DEF_PEIXE5:     			; tabela que define o peixe5
+	WORD LARGURA
+	WORD ALTURA
+	WORD 0, 0FF62H, 0, 0, 0FF62H 
+	WORD 0, 0, 0FF62H, 0FF62H, 0
+	WORD 0, 0, 0FF62H, 0FF62H, 0
+	WORD 0, 0FF62H,  0FF62H, 0FF62H, 0FF62H
+	WORD 0, 0F000H,  0FF62H, 0FF62H, 0F000H
 
-TABELA_MINA:			; varios tamanhos das minas
+TABELA_MINA:				; varios tamanhos das minas
 	WORD DEF_MINA1
 	WORD DEF_MINA2
 	WORD DEF_MINA3
 	WORD DEF_MINA4
 	WORD DEF_MINA5
 
-TABELA_PEIXE:			; varios tamanhos dos peixes
+TABELA_PEIXE:				; varios tamanhos dos peixes
 	WORD DEF_PEIXE1
 	WORD DEF_PEIXE2
 	WORD DEF_PEIXE3
@@ -282,110 +289,135 @@ TABELA_PEIXE:			; varios tamanhos dos peixes
 	WORD DEF_PEIXE5
 	
 
-DEF_BONECO:				; tabela que define otubarão (cor, largura, pixels)
-	WORD  LARGURA
-	WORD  ALTURA_TUBARAO
-	WORD  0, 0, 0F258H, 0, 0
-	WORD  0F000H, 0F258H, 0FFFFH, 0F258H, 0F000H 
-	WORD  0F258H, 0FFFFH, 0FF00H, 0FFFFH, 0F258H
-	WORD  0FFFFH, 0FF00H, 0FB00H, 0FF00H, 0FFFFH
+DEF_TUBARAO:				; tabela que define o tubarão
+	WORD LARGURA
+	WORD ALTURA_TUBARAO
+	WORD 0, 0, 0F258H, 0, 0
+	WORD 0F000H, 0F258H, 0FFFFH, 0F258H, 0F000H 
+	WORD 0F258H, 0FFFFH, 0FF00H, 0FFFFH, 0F258H
+	WORD 0FFFFH, 0FF00H, 0FB00H, 0FF00H, 0FFFFH
 	
 
-DEF_EXPLOSAO:
-	WORD  LARGURA
-	WORD  6
-WORD    0, 0FF62H, 0FFA1H, 0FF62H, 0
-WORD    0FF62H, 0FFA1H, 0FFA1H, 0FFA1H, 0FF62H
-WORD    0FFA1H, 0FFA1H, 0FFFFH, 0FFA1H, 0FFA1H
-WORD    0FF62H, 0FFA1H, 0FFA1H, 0FFA1H, 0FF62H
-WORD    0, 0FF62H, 0FFA1H, 0FF62H, 0, 0
-WORD	0,0,0,0,0
+DEF_EXPLOSAO:				; tabela que define a explosao
+	WORD LARGURA
+	WORD ALTURA_EXPLOSAO
+	WORD 0, 0FF62H, 0FFA1H, 0FF62H, 0
+	WORD 0FF62H, 0FFA1H, 0FFA1H, 0FFA1H, 0FF62H
+	WORD 0FFA1H, 0FFA1H, 0FFFFH, 0FFA1H, 0FFA1H
+	WORD 0FF62H, 0FFA1H, 0FFA1H, 0FFA1H, 0FF62H
+	WORD 0, 0FF62H, 0FFA1H, 0FF62H, 0, 0
+	WORD 0, 0, 0, 0, 0
 
-TABELA_EXPLOSAO:
+TABELA_EXPLOSAO:			; tamanho unico da explosao
 	WORD DEF_EXPLOSAO
 
-DEF_MISSIL:
+DEF_MISSIL:					; tabela que define o missil 
 	WORD 1
 	WORD 1
 	WORD 0FB00H
 
 
-ENERGIA: WORD 64H		; variavel global do valor da energia	
-PAUSADO: WORD 0
-POSICAO_EXPLOSAO: WORD 0
+ENERGIA: WORD 64H			; variavel global do valor da energia	
+PAUSADO: WORD 0				; variavel global para verificar se o jogo esta em pausa
+POSICAO_EXPLOSAO: WORD 0	; variavel global 
 ; *********************************************************************************
 ; * Código
 ; *********************************************************************************
-PLACE   0                     ; o código tem de começar em 0000H
+PLACE   0                   ; o código tem de começar em 0000H
 
 inicio:
-	MOV  SP, SP_inicial_prog_princ		; inicializa SP do programa principal
+	MOV SP, SP_inicial_prog_princ	; inicializa SP do programa principal
 	MOV BTE, BTE_START
-	EI0					; permite interrupções 0
-	EI1
-	EI2					; permite interrupções 2
-					; permite interrupções (geral)
+	EI0						; permite interrupções 0
+	EI1						; permite interrupções 1
+	EI2						; permite interrupções 2
                             
-    MOV  [APAGA_AVISO], R1	; apaga o aviso de nenhum cenário selecionado (o valor de R1 não é relevante)
-    MOV  [APAGA_ECRÃ], R1	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
-	MOV	 R1, 0				; cenário de fundo número 0
-    MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
-	MOV	 R7, 1				; valor a somar à coluna do boneco, para o movimentar
+    MOV [APAGA_AVISO], R1	; apaga o aviso de nenhum cenário selecionado (o valor de R1 não é relevante)
+    MOV [APAGA_ECRÃ], R1	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
+	MOV	R1, 0				; cenário de fundo número 0
+    MOV [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+	MOV	R7, 1				; valor a somar à coluna do boneco, para o movimentar
      
 	; cria processos. O CALL não invoca a rotina, apenas cria um processo executável
-	CALL  teclado			; cria o processo teclado
-	CALL  boneco			; cria o processo boneco
-	CALL missil
-	CALL energia
-	CALL pausa
-	MOV R11, MAX_MINAS
+	CALL teclado			; cria o processo teclado
+	CALL boneco				; cria o processo boneco
+	CALL missil				; cria o processo missil
+	CALL energia			; cria o processo energia
+	CALL pausa				; cria o processo pausa
+	CALL fim				; cria o processo fim
+	MOV R11, MAX_OBJETOS	; numero maximo de objetos (peixes e minas)
 	loop_bonecos:
-	SUB	R11, 1			; próximo boneco
-	CALL	mina		; cria uma nova instância do processo boneco (o valor de R11 distingue-as)
-						; Cada processo fica com uma cópia independente dos registos
-	CMP  R11, 0			; já criou as instâncias todas?
-    JNZ	 loop_bonecos	; se não, continua
+	SUB	R11, 1				; próximo boneco
+	CALL objeto				; cria uma nova instância do processo boneco (o valor de R11 distingue-as)
+							; Cada processo fica com uma cópia independente dos registos
+	CMP R11, 0				; já criou as instâncias todas?
+    JNZ	loop_bonecos		; se não, continua
 	
 
 	; o resto do programa principal é também um processo (neste caso, trata dos displays)
 display_setup:
-	MOV  R2, [ENERGIA]		; valor do contador, cujo valor vai ser mostrado nos displays
-	MOV  R0, DISPLAYS       ; endereço do periférico que liga aos displays
+	MOV R2, [ENERGIA]		; valor do contador, cujo valor vai ser mostrado nos displays
+	MOV R0, DISPLAYS        ; endereço do periférico que liga aos displays
 	 
 	MOV R5, 0				; valor da energia em decimal
-	MOV R4, DECIMAL_1000	; 1000 em decimal
+	MOV R4, DECIMAL_1000	; 1000 representado em hexadecimal
 
-calcula_decimal:
+calcula_decimal:			; converte a energia de hexadecimal para decimal
 	MOV R3, R2				; valor inicial da energia
 	MOD R3, R4				; valor a converter
 	MOV R10, DECIMAL_10		; 10 em decimal
 	DIV R4, R10				; fator de divisão
-	CMP R4, 0
-	JZ atualiza_display
+	CMP R4, 0				; ve se ja é menor que 10
+	JZ atualiza_display		; se for, acaba a conversao
 	MOV R6, R3				; vamos calcular o digito
 	DIV R6, R4				; digito
 	SHL R5, 4				; mais um digito do valor decimal
 	OR R5, R6				; vai compondo o resultado
-	JMP calcula_decimal
+	JMP calcula_decimal		; repete
 
-atualiza_display:
-	MOV R8, [PAUSADO]
-	MOV R10, 0
-	CMP R8, R10
-	JNZ pausame
-	EI
+atualiza_display:			; atualiza o display com a energia
+	MOV R8, [PAUSADO]		; lê a variavel do estado de pausa do jogo
+	MOV R10, 0				
+	CMP R8, R10				; ve se a variavel é 0
+	JNZ pausame				; se nao for zero, vai pausar
+	EI						; ativa as interrupções (geral)
 checkpoint1:	
-	MOV  [R0], R5          ; mostra o valor do contador nos displays
+	MOV  [R0], R5           ; mostra o valor do contador nos displays
 	YIELD
 	JMP display_setup
 
 pausame:
-	DI
+	DI						; desativa as interrupções (geral)
 	JMP checkpoint1
 
 
 
+; **********************************************************************
+; Processo
+;
+; FIM - Processo que deteta quando se carrega na tecla de terminar o jogo,
+;		e termina-o
+;
+; **********************************************************************
+PROCESS SP_inicial_fim
+fim:
+YIELD
+	MOV	 R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
+	MOV R9,TECLA_2				; tecla para terminar o jogo
+	CMP	 R3, R9					; é a tecla para terminar o jogo?
+	JNZ fim						; se náo é, sai
+	MOV R10, 1					; se 
+	MOV  [APAGA_ECRÃ], R4	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
+	MOV	 R1, 4				; cenário de fundo número 0
+	MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+fim_loop:
+	JMP fim_loop
 
+
+
+
+
+; **************************************************+
 PROCESS SP_inicial_pausa
 pausa:
 	MOV R1, 04AFH
@@ -420,7 +452,7 @@ tempo:
 		MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
 		MOV  R1, [posicao_tubarao]			; linha do boneco
 		MOV	 R2, [posicao_tubarao+2]
-		MOV	 R4, DEF_BONECO		; endereço da tabela que define o boneco
+		MOV	 R4, DEF_TUBARAO		; endereço da tabela que define o boneco
 		CALL desenha_boneco
 		JMP pausa
 
@@ -519,7 +551,7 @@ boneco:
 	; desenha o boneco na sua posição inicial
     MOV  R1, LINHA			; linha do boneco
 	MOV	 R2, COLUNA
-	MOV	 R4, DEF_BONECO		; endereço da tabela que define o boneco
+	MOV	 R4, DEF_TUBARAO		; endereço da tabela que define o boneco
 	MOV  R5, 8				; atraso
 ciclo_boneco:
 	CALL  desenha_boneco	; desenha o boneco a partir da tabela
@@ -723,15 +755,15 @@ apaga_MISSIL:
 
 
 ;processo mina==========================================================
-PROCESS SP_inicial_mina0
-
+PROCESS SP_inicial_objeto0
+objeto:
 mina:
 	CALL rand
 	CMP R4, 3
 	JLT peixe
 	MOV  R10, R11			; cópia do nº de instância do processo
 	SHL  R10, 1			; multiplica por 2 porque as tabelas são de WORDS
-	MOV  R9, minaSP_tab	; tabela com os SPs iniciais das várias instâncias deste processo
+	MOV  R9, objetosSP_tab	; tabela com os SPs iniciais das várias instâncias deste processo
 	MOV	SP, [R9+R10]		; re-inicializa SP deste processo, de acordo com o nº de instância
 	MOV R9,coluna_minas
 	CALL rand
@@ -867,7 +899,7 @@ verifica_colisao_tubarao:
 peixe:
 	MOV  R10, R11			; cópia do nº de instância do processo
 	SHL  R10, 1			; multiplica por 2 porque as tabelas são de WORDS
-	MOV  R9, minaSP_tab	; tabela com os SPs iniciais das várias instâncias deste processo
+	MOV  R9, objetosSP_tab	; tabela com os SPs iniciais das várias instâncias deste processo
 	MOV	SP, [R9+R10]		; re-inicializa SP deste processo, de acordo com o nº de instância
 	MOV R9,coluna_minas
 	CALL rand
