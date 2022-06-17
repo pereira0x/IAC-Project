@@ -66,14 +66,19 @@ DECIMAL_10		EQU 000AH      ; numero 10 em hexadecimal
 DECIMAL_1000	EQU 03E8H	   ; numero 1000 em hexadecimal
 
 MAX_OBJETOS		EQU 4		   ; numero maximo de minas em tela
-DECREMENTA_ENERGIA_VALOR EQU 5 ; valor a decrementar à energia
-DECREMENTA_MISSIL_VALOR  EQU 5 ; valor a decrementar à energia quando um missil destroi uma mina
-DECREMENTA_ENERGIA_VALOR_XL EQU 10 ; valor a decrementar à energia quando o tubarao come um peixe
+ENERGIA_VALOR 	EQU 5 		   ; valor a decrementar à energia
+ENERGIA_MISSIL_VALOR  EQU 5	   ; valor a decrementar à energia quando um missil destroi uma mina
+ENERGIA_VALOR_XL EQU 10 	   ; valor a decrementar à energia quando o tubarao come um peixe
 
-PAUSA_TIME		EQU 04AFH	   ; valor entre pausas
+PAUSA_TEMPO		EQU 04AFH	   ; valor de tempo entre pausas
+EXPLOSAO_TEMPO  EQU 0FFFH	   ; valor de tempo que a explosão fica ativa
 LIMITE_MISSIL   EQU 15		   ; valor do limite do missil
 FORA_DO_ECRA    EQU 200        ; posicao fora do ecra do missil
 
+LINHA_OBJETO1		EQU 3		   ; linha até qual se desenha a mina1
+LINHA_OBJETO2		EQU 6		   ; linha até qual se desenha a mina2
+LINHA_OBJETO3		EQU	9		   ; linha até qual se desenha a mina3
+LINHA_OBJETO4		EQU 12		   ; linha até qual se desenha a mina4
 
 ; *********************************************************************************
 ; * Dados 
@@ -113,13 +118,13 @@ SP_inicial_objeto2:
 SP_inicial_objeto3:		
 
 
-linha_minas:			; linha em que cada mina está
+linhas_objetos:			; linha em que cada mina está
 	WORD 0
 	WORD 0
 	WORD 0
 	WORD 0
                               
-coluna_minas:			; colunas iniciais em que cada mina está
+coluna_objetos:			; colunas iniciais em que cada mina está
 	WORD 5
 	WORD 15
 	WORD 24
@@ -146,7 +151,7 @@ objetosSP_tab:				; varias instancias dos objetos
 
 
 BTE_START:
-	WORD movimenta_mina		; interrupção da mina
+	WORD movimenta_objeto		; interrupção da mina
 	WORD movimenta_missil	; interrupção do missil
 	WORD interrupt_energia  ; interrupção da energia
 	WORD 0
@@ -159,7 +164,7 @@ tecla_continuo:
 	LOCK 0				; LOCK para o teclado comunicar aos restantes processos que tecla detetou,
 						; enquanto a tecla estiver carregada
 
-mina_anda:				; LOCK para a rotina de interrupção comunicar ao processo desce minas que 
+objeto_anda:				; LOCK para a rotina de interrupção comunicar ao processo desce minas que 
 	LOCK 0				; é para andar
 
 missil_anda:			; LOCK para a rotina de interrupção comunicar ao processo do missil que 
@@ -427,7 +432,7 @@ fim_loop:						; fica aqui para sempre
 ; **********************************************************************
 PROCESS SP_inicial_pausa
 pausa:
-	MOV R1, PAUSA_TIME  ; valor a esperar entre pausas, de forma nao bloqueante
+	MOV R1, PAUSA_TEMPO  ; valor a esperar entre pausas, de forma nao bloqueante
 tempo:
 	YIELD
 	
@@ -624,7 +629,7 @@ espera_tecla_disparar:
 
 
 ciclo_missil_energia:
-	MOV R10, DECREMENTA_MISSIL_VALOR	; valor a decrementar
+	MOV R10, ENERGIA_MISSIL_VALOR	; valor a decrementar
 	MOV R11, [ENERGIA]			; leitura do valora atual da energia
 	SUB R11, R10				; subtrai o valor a decrementar
 	MOV [ENERGIA], R11			; escreve o novo valor da energia
@@ -646,26 +651,310 @@ Testa_top:						; testa o limite maximo superior do missil
 	JMP missil					; repete
 
 sobe_missil:	
-	CALL apaga_MISSIL		; apaga o missil na sua posição corrente
-	MOV	R6, [R4]			; obtém a largura do missil
-	SUB	R1, 1				; para desenhar objeto na linha seguinte
-	MOV[posicao_missil], R1	; guarda a posicão (linha) do missil
-	MOV[posicao_missil+2], R2; guarda a posição (coluna) do missil
+	CALL apaga_MISSIL			; apaga o missil na sua posição corrente
+	MOV	R6, [R4]				; obtém a largura do missil
+	SUB	R1, 1					; para desenhar objeto na linha seguinte
+	MOV[posicao_missil], R1		; guarda a posicão (linha) do missil
+	MOV[posicao_missil+2], R2	; guarda a posição (coluna) do missil
 	JMP	 ciclo_missil		
 
 desenha_MISSIL:
 	PUSH R3
-	MOV R3, 0FB00H ; cor do missil
+	MOV R3, 0FB00H 				; cor do missil
 	CALL escreve_pixel
 	POP R3
 	RET
 
 apaga_MISSIL:
 	PUSH R3
-	MOV R3, 0 ; cor do missil
+	MOV R3, 0 					; cor do missil
 	CALL escreve_pixel
 	POP R3
 	RET
+
+; **********************************************************************
+; Processo
+;
+; OBJETO - Processo que desenha um um objeto (peixe ou mina), e o movimento verticalmente
+; 			temporizado com a interrupção 0
+; **********************************************************************
+PROCESS SP_inicial_objeto0
+objeto:
+mina:
+	CALL rand					; obtem um numero random (0-9)
+	CMP R4, 3					; ve se o random é 0, 1 ou 2
+	JLT peixe					; se for, vai criar um peixe, se nao uma mina
+	MOV R10, R11				; cópia do nº de instância do processo
+	SHL R10, 1					; multiplica por 2 porque as tabelas são de WORDS
+	MOV R9, objetosSP_tab		; tabela com os SPs iniciais das várias instâncias deste processo
+	MOV	SP, [R9+R10]			; re-inicializa SP deste processo, de acordo com o nº de instância
+	MOV R9, coluna_objetos		; colunas iniciais dos objetos
+	CALL rand					; obtem um numero random
+	MOV R7, 8					
+	MUL R4, R7					; multiplica o numero por 8
+	MOV [R9+R10], R4			; NAOSEI
+	MOV R2, [R9+R10]			; linha do tubarao
+	MOV R9,linhas_objetos			; linhas em que cada mina está
+	
+	MOV	R1, [R9+R10]			; NAOSEI
+	MOV R4, [TABELA_MINA]		; tamanho da mina default
+	MOV R7, 1					; NAOSEI
+	
+	MOV R11,0					; NAOSEI
+
+ciclo_mina:
+	CALL desenha_objeto			; desenha a mina
+	MOV  R9, objeto_anda			; LOCK para ver se é para deslocar a mina
+	MOV  R3, [R9]				; lê o LOCK desta instância (bloqueia até a rotina de interrupção
+								; respetiva escrever neste LOCK)
+								; Quando bloqueia, passa o controlo para outro processo
+								; Como não há valor a transmitir, o registo pode ser um qualquer		
+
+testa_descer:					; verifica se pode descer a mina
+	MOV R9, MAX_LINHA			; linha maxima
+	CMP R1, R9					; ve se esta na linha maxima
+	JZ mina						; se estiver, nao desce, volta ao inicio
+	CMP R11, 2					; NAOSEI
+	JGE	mina_evolui				; verifica qual desenho da minha é para desenhar
+
+
+mina_evolui:
+	MOV R5,LINHA_OBJETO1		; até desta linha, desenha a mina1
+	CMP R1, R5
+	JLT	mina1					; desenha a mina1´
+	MOV R5, LINHA_OBJETO2		; até desta linha, desenha a mina2
+	CMP R1, R5
+	JLT	mina2					; desenha a mina2
+	MOV R5, LINHA_OBJETO3		; até desta linha, desenha a mina3
+	CMP R1, R5
+	JLT	mina3					; desenha a mina3
+	MOV R5, LINHA_OBJETO4		; até desta linha, desenha a mina4
+	CMP R1, R5
+	JLT	mina4					; desenha a mina4
+	JMP	mina5					; desenha a mina5
+
+mina1:
+	MOV R4, [TABELA_MINA+2]		; endereço da tabela que define a mina1
+	JMP desce_mina				; vai descer
+
+mina2:
+	MOV R4, [TABELA_MINA+4]		; endereço da tabela que define a mina2
+	JMP desce_mina				; vai descer
+
+mina3:
+	MOV R4, [TABELA_MINA+6]		; endereço da tabela que define a mina3
+	JMP desce_mina				; vai descer
+
+mina4:
+	MOV R4, [TABELA_MINA+8]		; endereço da tabela que define a mina4
+	JMP desce_mina				; vai descer
+
+mina5:
+	JMP desce_mina				; vai descer
+
+
+
+desce_mina:						; desce a mina
+	CALL apaga_objeto				; apaga a mina
+	ADD R1, 1					; NAOSEI
+
+testa_colisao_missil:			; testa a colisao de uma mina com um missil
+	MOV R5,[posicao_missil]		; obtem posição (linha do missil)
+	MOV R6,[posicao_missil+2]	; obtem posição (coluna do missil)
+	MOV R9, 0					; NAOSEI
+	MOV R9, R1					; NAOSEI		
+	ADD R9, 5					; NAOSEI
+	CMP R9, R5					; NAOSEI
+	JLT verifica_colisao_tubarao; NAOSEI
+
+	CMP R1, R5					; NAOSEI
+	JGT verifica_colisao_tubarao; NAOSEI
+
+	CMP R6, R2					; NAOSEI
+	JLT verifica_colisao_tubarao; NAOSEI
+
+	MOV R10, R2					; NAOSEI
+	ADD R10, 5					; NAOSEI
+	CMP R6, R10					; NAOSEI
+	JGT verifica_colisao_tubarao; NAOSEI
+	; houve colisão
+	MOV R9, 0					; seleciona o som 0
+	MOV [TOCA_SOM], R9			; toca o som 
+	CALL incrementa_energia		; incrementa a energia 
+	; animação da explosão
+	MOV R4, [TABELA_EXPLOSAO]	; tabela que define a explosão
+	MOV[posicao_explosao], R1	; define a linha da posição da explosão
+	MOV [posicao_explosao+2], R2; define a coluna da posição da explosão
+	CALL desenha_objeto			; desenha a explosão
+	MOV R10, EXPLOSAO_TEMPO		; tempo de explosão
+
+tempo_mina_explosao:			; tempo de duração da explosão
+	YIELD
+	SUB R10, 1					; subtrai uma unidade
+	JNZ tempo_mina_explosao					; repete ate ser zero
+	CALL apaga_objeto				; vai apagar a mina
+	JMP mina
+	
+	
+
+verifica_colisao_tubarao:		; verifica se a mina colidiu com um tubarão
+	MOV R5, [posicao_tubarao]	; lê a posição (linha) do tubarão
+	MOV R6, [posicao_tubarao+2] ; lê a posiçaõ (coluna) do tubarão
+	MOV R9, R1					; NAOSEI esta toda, comenta pls
+	ADD R9, 5
+	CMP R9, R5
+	JLT ciclo_mina
+
+	MOV R9, R5					; NAOSEI esta toda, comenta pls
+	ADD R5, 5
+	CMP R1, R5
+	JGT ciclo_mina
+
+	MOV R8, R6					; NAOSEI esta toda, comenta pls
+	ADD R6, 5
+	CMP R6, R2
+	JLT ciclo_mina				; NAOSEI esta toda, comenta pls
+
+	MOV R10, R2
+	ADD R10, 5
+	CMP R8, R10
+	JGT ciclo_mina
+
+	JMP fim_de_jogo				; se houve colisão, perde o jogo
+
+
+peixe:						; instância de um peixe
+	MOV R10, R11			; cópia do nº de instância do processo
+	SHL R10, 1				; multiplica por 2 porque as tabelas são de WORDS
+	MOV R9, objetosSP_tab	; tabela com os SPs iniciais das várias instâncias deste processo
+	MOV	SP, [R9+R10]		; re-inicializa SP deste processo, de acordo com o nº de instância
+	MOV R9, coluna_objetos	; colunas iniciais dos objetos
+	CALL rand				; obtem um número random
+	MOV R7,8				; NAOSEI
+	MUL R4,R7				; NAOSEI
+	MOV [R9+R10], R4		; NAOSEI
+	MOV R2, [R9+R10]		; linha do tubarao
+	MOV R9, linhas_objetos	; linhas em que cada objeto está
+	
+	MOV	R1, [R9+R10]		; NAOSEI
+	MOV R4, [TABELA_PEIXE]	; tamanho do peixe default
+	MOV R7, 1				; NAOSEI
+	MOV R11,0				; NAOSEI
+
+ciclo_peixe:
+	CALL desenha_objeto		; desenha o peixe 
+	MOV R9, objeto_anda	; avisa que é para tentar mover o peixe
+	MOV R3, [R9]			; lê o LOCK desta instância (bloqueia até a rotina de interrupção
+							; respetiva escrever neste LOCK)
+							; Quando bloqueia, passa o controlo para outro processo
+							; Como não há valor a transmitir, o registo pode ser um qualquer		
+
+testa_descer_peixe:			; testa tentar descer o peixe
+	MOV R9,MAX_LINHA		; linha maxima onde o peixe pode estar
+	CMP R1,R9				; ve se está na linha maxima
+	JZ peixe				; se tiver, sai
+
+	CMP R11,2				; NAOSEI
+	JGE	peixe_evolui		; vai ver qual tamanho de peixe é para desenhar
+
+
+peixe_evolui:
+	MOV R5, LINHA_OBJETO1	; linha até a qual se desenha o peixe1
+	CMP R1, R5
+	JLT	peixe1				; desenha o peixe1
+	MOV R5, LINHA_OBJETO2	; linha até a qual se desenha o peixe2
+	CMP R1, R5
+	JLT	peixe2				; desenha o peixe2
+	MOV R5, LINHA_OBJETO3	; linha até a qual se desenha o peixe3
+	CMP R1, R5
+	JLT	peixe3				; desenha o peixe3
+	MOV R5, LINHA_OBJETO4	; linha até a qual se desenha o peixe4
+	CMP R1, R5
+	JLT	peixe4				; desenha o peixe4
+	JMP	peixe5				; desenha o peixe5
+
+peixe1:
+	MOV R4, [TABELA_PEIXE+2]; endereço da tabela que define o peixe1
+	JMP desce_peixe			; vai descer o peixe
+
+peixe2:
+	MOV R4, [TABELA_PEIXE+4]; endereço da tabela que define o peixe2
+	JMP desce_peixe			; vai descer o peixe
+
+peixe3:
+	MOV R4, [TABELA_PEIXE+6]; endereço da tabela que define o peixe3
+	JMP desce_peixe			; vai descer o peixe
+
+peixe4:
+	MOV R4, [TABELA_PEIXE+8]; endereço da tabela que define o peixe4
+	JMP desce_peixe			; vai descer o peixe
+
+peixe5:						; tamanho default, peixe5
+	JMP desce_peixe			; vai descer o peixe
+
+desce_peixe:				; desce o peixe por uma linha
+	CALL apaga_objeto		; apaga o peixe
+	ADD R1, 1				; NAOSEI
+
+testa_colisao_missil_peixe:
+	MOV R5,[posicao_missil]		; obtem a posição (linha) do missil
+	MOV R6,[posicao_missil+2]	; obtem a posição (coluna) do missil
+	MOV R9,0				; NAOSEI, completa até ao fim deste pedaço pls
+	MOV R9,R1
+	ADD R9,5
+	CMP R9,R5
+	JLT verifica_colisao_tubarao_peixe
+
+	CMP R1,R5
+	JGT verifica_colisao_tubarao_peixe
+
+	CMP R6,R2
+	JLT verifica_colisao_tubarao_peixe
+
+	MOV R10,R2
+	ADD R10,5
+	CMP R6,R10
+	JGT verifica_colisao_tubarao_peixe
+	MOV R9,0			; seleciona o som 0
+	MOV [TOCA_SOM],R9	; toca o som
+	; animação da explosão
+	MOV R4, [TABELA_EXPLOSAO]	; tabela que define a explosão
+	MOV[posicao_explosao], R1	; define a posição (linha) da explosão
+	MOV [posicao_explosao+2], R2; define a posição (coluna) da explosão
+	CALL desenha_objeto			; desenha a explosão
+	MOV R10, EXPLOSAO_TEMPO		; duração da explosão
+tempo_peixe_explosao:	
+	YIELD
+	SUB R10, 1					; subtrai uma unidade
+	JNZ tempo_peixe_explosao	; se nao for zero, repete
+	CALL apaga_objeto			; apaga a explosão
+	JMP objeto
+	
+verifica_colisao_tubarao_peixe: ; verifica a colisão do peixe com o tubarão
+	MOV R5, [posicao_tubarao]	; obtem a posição do tubarão (linha)
+	MOV R6, [posicao_tubarao+2]	; obtem a posição do tubarão (coluna)
+	MOV R9, R1					; NAOSEI, completa ate ao fim pls
+	ADD R9, 5
+	CMP R9, R5
+	JLT ciclo_peixe
+
+	MOV R9, R5
+	ADD R5, 5
+	CMP R1, R5
+	JGT ciclo_peixe
+
+	MOV R8, R6
+	ADD R6, 5
+	CMP R6, R2
+	JLT ciclo_peixe
+
+	MOV R10, R2
+	ADD R10, 5
+	CMP R8, R10
+	JGT ciclo_peixe
+
+	CALL incrementa_energia_peixe	; incrementa a energia
+	JMP mina
 
 ; **********************************************************************
 ; * ROTINAS                                                            
@@ -764,337 +1053,56 @@ apaga_pixels:       			; desenha os pixels do tubarao a partir da tabela
 	POP R1
 	RET
 
-;processo mina==========================================================
-PROCESS SP_inicial_objeto0
-objeto:
-mina:
-	CALL rand
-	CMP R4, 3
-	JLT peixe
-	MOV  R10, R11			; cópia do nº de instância do processo
-	SHL  R10, 1			; multiplica por 2 porque as tabelas são de WORDS
-	MOV  R9, objetosSP_tab	; tabela com os SPs iniciais das várias instâncias deste processo
-	MOV	SP, [R9+R10]		; re-inicializa SP deste processo, de acordo com o nº de instância
-	MOV R9,coluna_minas
-	CALL rand
-	MOV R7,8
-	MUL R4,R7
-	MOV  [R9+R10],R4
-	MOV  R2, [R9+R10]			; linha do tubarao
-	MOV R9,linha_minas
-	
-	MOV	 R1, [R9+R10]
-	MOV R4, [TABELA_MINA]
-	MOV R7,1
-
-	
-	MOV R11,0
-
-ciclo_mina:
-	CALL desenha_mina
-	MOV  R9, mina_anda
-	MOV  R3, [R9]		; lê o LOCK desta instância (bloqueia até a rotina de interrupção
-						; respetiva escrever neste LOCK)
-						; Quando bloqueia, passa o controlo para outro processo
-						; Como não há valor a transmitir, o registo pode ser um qualquer		
-
-testa_descer:
-	MOV R9,MAX_LINHA
-	CMP R1,R9
-	JZ mina
-
-CMP R11,2
-JGE	mina_evolui
-
-
-mina_evolui:
-	MOV R5,3
-	CMP R1,R5
-	JLT	mina1
-	MOV R5,6
-	CMP R1,R5
-	JLT	mina2
-	MOV R5,9
-	CMP R1,R5
-	JLT	mina3
-	MOV R5,12
-	CMP R1,R5
-	JLT	mina4
-	JMP	mina5
-
-	mina1:
-	MOV R4, [TABELA_MINA+2]		; endereço da tabela que define o bonec
-
-	JMP desce_mina
-	mina2:
-	MOV R4, [TABELA_MINA+4]		; endereço da tabela que define o bonec
-	JMP desce_mina
-	mina3:
-	MOV R4, [TABELA_MINA+6]		; endereço da tabela que define o bonec
-	JMP desce_mina
-	mina4:
-	MOV R4, [TABELA_MINA+8]		; endereço da tabela que define o bonec
-	JMP desce_mina
-	mina5:
-	
-	JMP desce_mina
-
-
-
-desce_mina:
-	CALL apaga_mina
-	ADD R1,1
-
-MOV R5,[posicao_missil]
-MOV R6,[posicao_missil+2]
-testa_colisao_missil:
-	MOV R9,0
-	MOV R9,R1
-	ADD R9,5
-	CMP R9,R5
-	JLT verifica_colisao_tubarao
-
-	CMP R1,R5
-	JGT verifica_colisao_tubarao
-
-	CMP R6,R2
-	
-	JLT verifica_colisao_tubarao
-	MOV R10,R2
-	ADD R10,5
-	CMP R6,R10
-	JGT verifica_colisao_tubarao
-	MOV R9,0
-	MOV [TOCA_SOM],R9
-	CALL incrementa_energia
-		; explode me
-	MOV R4, [TABELA_EXPLOSAO]
-	MOV[posicao_explosao], R1
-	MOV [posicao_explosao+2], R2
-	CALL desenha_mina
-	MOV R10, 0FFFH
-BACK1:
-	YIELD
-	SUB R10, 1
-	JNZ BACK
-	CALL apaga_mina
-	JMP mina
-	
-	
-
-verifica_colisao_tubarao:
-	MOV R5,[posicao_tubarao]
-	MOV R6,[posicao_tubarao+2]
-	MOV R9,R1
-	ADD R9,5
-	CMP R9,R5
-	JLT ciclo_mina
-
-	MOV R9,R5
-	ADD R5,5
-	CMP R1,R5
-	JGT ciclo_mina
-
-	MOV R8,R6
-	ADD R6,5
-	CMP R6,R2
-	JLT ciclo_mina
-	MOV R10,R2
-	ADD R10,5
-	CMP R8,R10
-	JGT ciclo_mina
-	JMP fim_de_jogo
-
-
-peixe:
-	MOV  R10, R11			; cópia do nº de instância do processo
-	SHL  R10, 1			; multiplica por 2 porque as tabelas são de WORDS
-	MOV  R9, objetosSP_tab	; tabela com os SPs iniciais das várias instâncias deste processo
-	MOV	SP, [R9+R10]		; re-inicializa SP deste processo, de acordo com o nº de instância
-	MOV R9,coluna_minas
-	CALL rand
-	MOV R7,8
-	MUL R4,R7
-	MOV  [R9+R10],R4
-	MOV  R2, [R9+R10]			; linha do tubarao
-	MOV R9,linha_minas
-	
-	MOV	 R1, [R9+R10]
-	MOV R4, [TABELA_PEIXE]
-	MOV R7,1
-
-	
-	MOV R11,0
-
-ciclo_peixe:
-	CALL desenha_mina
-	MOV  R9, mina_anda
-	MOV  R3, [R9]		; lê o LOCK desta instância (bloqueia até a rotina de interrupção
-						; respetiva escrever neste LOCK)
-						; Quando bloqueia, passa o controlo para outro processo
-						; Como não há valor a transmitir, o registo pode ser um qualquer		
-
-testa_descer_peixe:
-	MOV R9,MAX_LINHA
-	CMP R1,R9
-	JZ peixe
-
-CMP R11,2
-JGE	peixe_evolui
-
-
-peixe_evolui:
-	MOV R5,3
-	CMP R1,R5
-	JLT	peixe1
-	MOV R5,6
-	CMP R1,R5
-	JLT	peixe2
-	MOV R5,9
-	CMP R1,R5
-	JLT	peixe3
-	MOV R5,12
-	CMP R1,R5
-	JLT	peixe4
-	JMP	peixe5
-
-	peixe1:
-	MOV R4, [TABELA_PEIXE+2]		; endereço da tabela que define o bonec
-
-	JMP desce_peixe
-	peixe2:
-	MOV R4, [TABELA_PEIXE+4]		; endereço da tabela que define o bonec
-	JMP desce_peixe
-	peixe3:
-	MOV R4, [TABELA_PEIXE+6]		; endereço da tabela que define o bonec
-	JMP desce_peixe
-	peixe4:
-	MOV R4, [TABELA_PEIXE+8]		; endereço da tabela que define o bonec
-	JMP desce_peixe
-	peixe5:
-	
-	JMP desce_peixe
-
-
-
-desce_peixe:
-	CALL apaga_mina
-	ADD R1,1
-
-MOV R5,[posicao_missil]
-MOV R6,[posicao_missil+2]
-testa_colisao_missil_peixe:
-	MOV R9,0
-	MOV R9,R1
-	ADD R9,5
-	CMP R9,R5
-	JLT verifica_colisao_tubarao_peixe
-
-	CMP R1,R5
-	JGT verifica_colisao_tubarao_peixe
-
-	CMP R6,R2
-	
-	JLT verifica_colisao_tubarao_peixe
-	MOV R10,R2
-	ADD R10,5
-	CMP R6,R10
-	JGT verifica_colisao_tubarao_peixe
-	MOV R9,0
-	MOV [TOCA_SOM],R9
-	; explode me
-	MOV R4, [TABELA_EXPLOSAO]
-	MOV[posicao_explosao], R1
-	MOV [posicao_explosao+2], R2
-	CALL desenha_mina
-	MOV R10, 0FFFH
-BACK:
-	YIELD
-	SUB R10, 1
-	JNZ BACK
-	CALL apaga_mina
-	JMP mina
-	
-	
-
-verifica_colisao_tubarao_peixe:
-	MOV R5,[posicao_tubarao]
-	MOV R6,[posicao_tubarao+2]
-	MOV R9,R1
-	ADD R9,5
-	CMP R9,R5
-	JLT ciclo_peixe
-
-	MOV R9,R5
-	ADD R5,5
-	CMP R1,R5
-	JGT ciclo_peixe
-
-	MOV R8,R6
-	ADD R6,5
-	CMP R6,R2
-	JLT ciclo_peixe
-	MOV R10,R2
-	ADD R10,5
-	CMP R8,R10
-	JGT ciclo_peixe
-	CALL incrementa_energiaOP
-	JMP mina
-
-
-	
-
-
 ;====================================================================================================
 ; **********************************************************************
-; DESENHA_mina - Desenha um mina na linha e coluna indicadas
+; desenha_objeto - Desenha um mina na linha e coluna indicadas
 ;			    com a forma e cor definidas na tabela indicada.
 ; Argumentos:   R1 - linha
 ;               R2 - coluna
 ;               R4 - tabela que define o mina
 ;
 ; **********************************************************************
-desenha_mina:
-	PUSH  R1
-	PUSH  R2
-	PUSH  R3
-	PUSH  R4
-	PUSH  R5
-	PUSH  R6
-	PUSH  R7
-	PUSH  R8
-	MOV  R8,R2
-	MOV  R7, [R4]				; obtém a largura do tubarao
-	MOV  R5,5
-	ADD	 R4, 2			
-	MOV	 R6, 6				; obtém a altura do tubarao	
-	ADD	 R4, 2					; endereço da cor do 1º pixel (2 porque a largura é uma word)
+desenha_objeto:
+	PUSH R1
+	PUSH R2
+	PUSH R3
+	PUSH R4
+	PUSH R5
+	PUSH R6
+	PUSH R7
+	PUSH R8
+	MOV R8, R2
+	MOV R7, [R4]				; obtém a largura do tubarao
+	MOV R5, 5
+	ADD	R4, 2			
+	MOV	R6, 6					; obtém a altura do tubarao	
+	ADD	R4, 2					; endereço da cor do 1º pixel (2 porque a largura é uma word)
 	JMP desenha_pixels
 	RET
 
 ; **********************************************************************
-; APAGA_mina - Apaga um mina na linha e coluna indicadas
+; apaga_objeto - Apaga um mina na linha e coluna indicadas
 ;			  com a forma definida na tabela indicada.
 ; Argumentos:   R1 - linha
 ;               R2 - coluna
 ;               R4 - tabela que define o mina
 ;
 ; **********************************************************************
-apaga_mina:
-	PUSH  R1
-	PUSH  R2
-	PUSH  R3
-	PUSH  R4
-	PUSH  R5
-	PUSH  R6
-	PUSH  R7
-	PUSH  R8
-	MOV  R8,R2
-	MOV	 R7, [R4]				; obtém a largura do tubarao
-	MOV  R5,5
-	ADD	 R4, 2			
-	MOV	 R6, [R4]				; obtém a altura do tubarao	
-	ADD	 R4, 5					; endereço da cor do 1º pixel (2 porque a largura é uma word)
+apaga_objeto:
+	PUSH R1
+	PUSH R2
+	PUSH R3
+	PUSH R4
+	PUSH R5
+	PUSH R6
+	PUSH R7
+	PUSH R8
+	MOV R8, R2
+	MOV	R7, [R4]				; obtém a largura do tubarao
+	MOV R5, 5
+	ADD	R4, 2			
+	MOV	R6, [R4]				; obtém a altura do tubarao	
+	ADD	R4, 5					; endereço da cor do 1º pixel (2 porque a largura é uma word)
 	JMP apaga_pixels
 	RET
 
@@ -1119,49 +1127,46 @@ escreve_pixel:
 ; Retorna: 	R7 - novo sentido de movimento (pode ser o mesmo)	
 ; **********************************************************************
 testa_limites:
-	PUSH  R5
-	PUSH  R6
+	PUSH R5
+	PUSH R6
 testa_limite_esquerdo:			; vê se o tubarao chegou ao limite esquerdo
-	MOV	 R5, MIN_COLUNA
-	CMP	 R2, R5
-	JGT	 testa_limite_direito
-	CMP	 R7, 0					; passa a deslocar-se para a direita
-	JGE	 sai_testa_limites
-	JMP	 impede_movimento		; entre limites. Mantém o valor do R7
+	MOV	R5, MIN_COLUNA
+	CMP	R2, R5
+	JGT	testa_limite_direito
+	CMP	R7, 0					; passa a deslocar-se para a direita
+	JGE	sai_testa_limites
+	JMP	impede_movimento		; entre limites. Mantém o valor do R7
 testa_limite_direito:			; vê se o tubarao chegou ao limite direito
-	ADD	 R6, R2					; posição a seguir ao extremo direito do tubarao
-	MOV	 R5, MAX_COLUNA
-	CMP	 R6, R5
-	JLE	 sai_testa_limites		; entre limites. Mantém o valor do R7
-	CMP	 R7, 0					; passa a deslocar-se para a direita
-	JGT	 impede_movimento
-	JMP	 sai_testa_limites
+	ADD	R6, R2					; posição a seguir ao extremo direito do tubarao
+	MOV	R5, MAX_COLUNA
+	CMP	R6, R5
+	JLE	sai_testa_limites		; entre limites. Mantém o valor do R7
+	CMP	R7, 0					; passa a deslocar-se para a direita
+	JGT	impede_movimento
+	JMP	sai_testa_limites
 impede_movimento:
-	MOV	 R7, 0					; impede o movimento, forçando R7 a 0
+	MOV	R7, 0					; impede o movimento, forçando R7 a 0
 sai_testa_limites:	
-	POP	 R6
-	POP	 R5
+	POP	R6
+	POP	R5
 	RET
 
 
-;rotina game over
-
+; **********************************************************************
+; fim_de_jogo - termina o jogo e muda o ecra
+; **********************************************************************
 fim_de_jogo:
     MOV  [APAGA_ECRÃ], R1	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
-	MOV	 R1, 1				; cenário de fundo número 0
+	MOV	 R1, 1				; cenário de fundo número 1
     MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
-	ciclo_fim_de_jogo:
+	ciclo_fim_de_jogo:		; fim de jogo
 	JMP ciclo_fim_de_jogo
 	RET
 
 ; **********************************************************************
 ; Rand - aleatorio
-; Argumentos:   R1 - linha
-;               R2 - coluna
-;               R3 - cor do pixel (em formato ARGB de 16 bits)
-;
+; Retorna:	R4 - um número aleatório entre 0  e 9
 ; **********************************************************************
-
 rand:
     PUSH R0
     PUSH R1
@@ -1173,12 +1178,14 @@ rand:
     POP R1
     POP R0
     RET 
-
+; **********************************************************************
+; incrementa_energia - aumenta a energia com o valor normal
+; **********************************************************************
 incrementa_energia:
 	PUSH R0
 	PUSH R1
 
-	MOV R0, DECREMENTA_ENERGIA_VALOR	; valor a decrementar
+	MOV R0, ENERGIA_VALOR	; valor a incrementar
 	MOV R1, [ENERGIA]		; leitura do valora atual da energia
 	ADD R1, R0				; subtrai o valor a decrementar
 	MOV [ENERGIA], R1		; escreve o novo valor da energia
@@ -1187,12 +1194,14 @@ incrementa_energia:
 	POP R0
 	RET
 
-
-incrementa_energiaOP:
+; **********************************************************************
+; incrementa_energia_peixe - aumenta a energia quando um peixe é comido
+; **********************************************************************
+incrementa_energia_peixe:
 	PUSH R0
 	PUSH R1
 
-	MOV R0, DECREMENTA_ENERGIA_VALOR_XL	; valor a decrementar
+	MOV R0, ENERGIA_VALOR_XL	; valor a incrementar
 	MOV R1, [ENERGIA]		; leitura do valora atual da energia
 	ADD R1, R0				; subtrai o valor a decrementar
 	MOV [ENERGIA], R1		; escreve o novo valor da energia
@@ -1201,11 +1210,14 @@ incrementa_energiaOP:
 	POP R0
 	RET
 
+; **********************************************************************
+; desincrementa_energia - diminiu a energia com o valor normal
+; **********************************************************************
 desincrementa_energia:
 	PUSH R0
 	PUSH R1
 
-	MOV R0, DECREMENTA_ENERGIA_VALOR	; valor a decrementar
+	MOV R0, ENERGIA_VALOR	; valor a decrementar
 	MOV R1, [ENERGIA]		; leitura do valora atual da energia
 	SUB R1, R0				; subtrai o valor a decrementar
 	MOV [ENERGIA], R1		; escreve o novo valor da energia
@@ -1214,35 +1226,12 @@ desincrementa_energia:
 	POP R0
 	RET
 
-
-;
-; Interrupts
-;
-
-
-interrupt_energia:
-	PUSH	R1
-	MOV [evento_int_energia],R1		; avisa que é para mover a mina
-	
-	POP	R1
-	RFE
-	
-movimenta_mina:
-	PUSH	R1
-	MOV [mina_anda],R1		; avisa que é para mover a mina
-	
-	POP	R1
-	RFE
-
-movimenta_missil:
-	PUSH	R1
-	MOV [missil_anda],R1		; avisa que é para mover a mina
-	
-	POP	R1
-	RFE
-
-
-
+; **********************************************************************
+; calcula_output - calcula qual o numero da tecla do tecla que foi premida
+; Argumentos: R[NAOSEI] - linha da tecla premida
+;			  R[NAOSEI] - linha da coluna premida
+; Retorna: R0 - numero da tecla
+; **********************************************************************
 calcula_output:		   ; Calcula o valor da tecla premida (0 a F)
 	PUSH R5
 	PUSH R7
@@ -1256,14 +1245,14 @@ calcula_output:		   ; Calcula o valor da tecla premida (0 a F)
     MOV R8,1            
 
 calcula_linha:         ; Conta qual a linha, a partir da 0
-    SHR R9,1           ;
-    ADD R5,R8          ; 
-    CMP R9,0           ;
-    JNZ calcula_linha  ;
-    SUB R5,R8          ;
+    SHR R9,1           ;NAOSEI
+    ADD R5,R8          ;NAOSEI
+    CMP R9,0           ;NAOSEI
+    JNZ calcula_linha  ;NAOSEI
+    SUB R5,R8          ;NAOSEI
      
 calcula_coluna:        ; Conta qual a coluna, a partir da 0
-    SHR R11,1          
+    SHR R11,1          ;NAOSEI esta rotina a serio nunca a percebi lol
     ADD R7,R8          
     CMP R11,0          
     JNZ calcula_coluna 
@@ -1279,3 +1268,24 @@ calcula_coluna:        ; Conta qual a coluna, a partir da 0
 	POP R7
 	POP R5
 	RET
+
+; ***********************************************************************
+; * Interrupts
+; ***********************************************************************
+interrupt_energia:
+	PUSH R1
+	MOV [evento_int_energia], R1		; avisa que é para diminuir a energia
+	POP	R1
+	RFE
+	
+movimenta_objeto:
+	PUSH R1
+	MOV [objeto_anda], R1		; avisa que é para mover o objeto
+	POP	R1
+	RFE
+
+movimenta_missil:
+	PUSH R1
+	MOV [missil_anda], R1		; avisa que é para mover a missil
+	POP	R1
+	RFE
