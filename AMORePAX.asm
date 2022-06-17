@@ -72,7 +72,7 @@ ENERGIA_MISSIL_VALOR  EQU 5	   ; valor a decrementar à energia quando um missil
 ENERGIA_VALOR_XL EQU 10 	   ; valor a decrementar à energia quando o tubarao come um peixe
 
 PAUSA_TEMPO		EQU 04AFH	   ; valor de tempo entre pausas
-EXPLOSAO_TEMPO  EQU 0FFFH	   ; valor de tempo que a explosão fica ativa
+EXPLOSAO_TEMPO  EQU 01FH	   ; valor de tempo que a explosão fica ativa
 LIMITE_MISSIL   EQU 15		   ; valor do limite do missil
 FORA_DO_ECRA    EQU 200        ; posicao fora do ecra do missil
 
@@ -85,6 +85,11 @@ LINHA_OBJETO4		EQU 12		   ; linha até qual se desenha a mina4
 ; * Dados 
 ; *********************************************************************************
 	PLACE       1000H
+	MOV R1, FORA_DO_ECRA		; tira o missil (linhas)
+	MOV R2, FORA_DO_ECRA		; tira o missil (colunas)
+	MOV[posicao_missil], R1		; guarda o valor da linha do missil
+	MOV[posicao_missil+2], R2	; guarda o valor da coluna do missil
+	JMP missil					; repete
 
 ; Reserva do espaço para as pilhas dos processos
 	STACK 100H			; espaço reservado para a pilha do processo "programa principal"
@@ -327,9 +332,10 @@ DEF_MISSIL:					; tabela que define o missil
 	WORD 0FB00H
 
 
-ENERGIA: WORD DECIMAL_100			; variavel global do valor da energia	
+ENERGIA: WORD DECIMAL_100	; variavel global do valor da energia	
 PAUSADO: WORD 0				; variavel global para verificar se o jogo esta em pausa
-POSICAO_EXPLOSAO: WORD 0	; variavel global 
+POSICAO_EXPLOSAO: WORD 0	; variavel global da posição da explosão
+EXPLOSAO_ACONTECEU: WORD 0	; variavel global para ver se existe uma explosão
 ; *********************************************************************************
 ; * Código
 ; *********************************************************************************
@@ -642,6 +648,9 @@ ciclo_missil_energia:
 	MOV [ENERGIA], R11			; escreve o novo valor da energia
 	
 ciclo_missil:
+	MOV R4, [EXPLOSAO_ACONTECEU]; le o valor de estado de explosoes
+	CMP R4, 0					; valor de NAO ha explosao
+	JNZ houve_explosao			; se houve explosao, sai daqui
 	CALL desenha_MISSIL			; desenha o missil a partir da tabela
 
 	MOV	R3, [missil_anda]		; LOCK para mover o missil
@@ -664,6 +673,15 @@ sobe_missil:
 	MOV[posicao_missil], R1		; guarda a posicão (linha) do missil
 	MOV[posicao_missil+2], R2	; guarda a posição (coluna) do missil
 	JMP	 ciclo_missil		
+
+houve_explosao:
+	MOV R1, FORA_DO_ECRA		; tira o missil (linhas)
+	MOV R2, FORA_DO_ECRA		; tira o missil (colunas)
+	MOV[posicao_missil], R1		; guarda o valor da linha do missil
+	MOV[posicao_missil+2], R2	; guarda o valor da coluna do missil
+	MOV R1, 0					; valor de NAO colisao
+	MOV [EXPLOSAO_ACONTECEU], R1; mete o valor default
+	JMP missil
 
 desenha_MISSIL:
 	PUSH R3
@@ -792,11 +810,13 @@ testa_colisao_missil:			; testa a colisao de uma mina com um missil
 	MOV R4, [TABELA_EXPLOSAO]	; tabela que define a explosão
 	MOV[posicao_explosao], R1	; define a linha da posição da explosão
 	MOV [posicao_explosao+2], R2; define a coluna da posição da explosão
-	CALL desenha_objeto			; desenha a explosão
+	MOV R10, 1					; avisa que houve uma explosão
+	MOV [EXPLOSAO_ACONTECEU], R10 ; escreve esse aviso
 	MOV R10, EXPLOSAO_TEMPO		; tempo de explosão
 
 tempo_mina_explosao:			; tempo de duração da explosão
 	YIELD
+	CALL desenha_objeto			; desenha a explosão
 	SUB R10, 1					; subtrai uma unidade
 	JNZ tempo_mina_explosao					; repete ate ser zero
 	CALL apaga_objeto				; vai apagar a mina
@@ -923,16 +943,18 @@ testa_colisao_missil_peixe:
 	ADD R10,5
 	CMP R6,R10
 	JGT verifica_colisao_tubarao_peixe
-	MOV R9,0			; seleciona o som 0
-	MOV [TOCA_SOM],R9	; toca o som
+	MOV R9,0					; seleciona o som 0
+	MOV [TOCA_SOM],R9			; toca o som
 	; animação da explosão
 	MOV R4, [TABELA_EXPLOSAO]	; tabela que define a explosão
 	MOV[posicao_explosao], R1	; define a posição (linha) da explosão
 	MOV [posicao_explosao+2], R2; define a posição (coluna) da explosão
-	CALL desenha_objeto			; desenha a explosão
+	MOV R10, 1					; avisa que houve uma explosão
+	MOV [EXPLOSAO_ACONTECEU], R10 ; escreve esse aviso
 	MOV R10, EXPLOSAO_TEMPO		; duração da explosão
 tempo_peixe_explosao:	
 	YIELD
+	CALL desenha_objeto			; desenha a explosão
 	SUB R10, 1					; subtrai uma unidade
 	JNZ tempo_peixe_explosao	; se nao for zero, repete
 	CALL apaga_objeto			; apaga a explosão
