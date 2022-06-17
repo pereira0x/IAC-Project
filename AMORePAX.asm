@@ -85,8 +85,8 @@ SP_inicial_prog_princ:
 	STACK 100H			; espaço reservado para a pilha do processo "teclado"
 SP_inicial_teclado:	
 						
-	STACK 100H			; espaço reservado para a pilha do processo "boneco"
-SP_inicial_boneco:	
+	STACK 100H			; espaço reservado para a pilha do processo "tubarao"
+SP_inicial_tubarao:	
 
 	STACK 100H			; espaço reservado para a pilha do processo "missil"
 SP_inicial_missil:		
@@ -164,7 +164,7 @@ missil_anda:			; LOCK para a rotina de interrupção comunicar ao processo do mi
 	LOCK 0				; é para disparar
 
 evento_int_0:
-	LOCK 0				; LOCK para a rotina de interrupção comunicar ao processo boneco que a interrupção ocorreu
+	LOCK 0				; LOCK para a rotina de interrupção comunicar ao processo tubarao que a interrupção ocorreu
 
 evento_int_energia:
 	LOCK 0				; LOCK para a rotina de interrupção comunicar que a interrupção ocorreu e
@@ -338,22 +338,22 @@ inicio:
     MOV [APAGA_ECRÃ], R1	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
 	MOV	R1, 0				; cenário de fundo número 0
     MOV [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
-	MOV	R7, 1				; valor a somar à coluna do boneco, para o movimentar
+	MOV	R7, 1				; valor a somar à coluna do tubarao, para o movimentar
      
 	; cria processos. O CALL não invoca a rotina, apenas cria um processo executável
 	CALL teclado			; cria o processo teclado
-	CALL boneco				; cria o processo boneco
+	CALL tubarao				; cria o processo tubarao
 	CALL missil				; cria o processo missil
 	CALL energia			; cria o processo energia
 	CALL pausa				; cria o processo pausa
 	CALL fim				; cria o processo fim
 	MOV R11, MAX_OBJETOS	; numero maximo de objetos (peixes e minas)
-	loop_bonecos:
-	SUB	R11, 1				; próximo boneco
-	CALL objeto				; cria uma nova instância do processo boneco (o valor de R11 distingue-as)
+	loop_tubaraos:
+	SUB	R11, 1				; próximo tubarao
+	CALL objeto				; cria uma nova instância do processo tubarao (o valor de R11 distingue-as)
 							; Cada processo fica com uma cópia independente dos registos
 	CMP R11, 0				; já criou as instâncias todas?
-    JNZ	loop_bonecos		; se não, continua
+    JNZ	loop_tubaraos		; se não, continua
 	
 
 	; o resto do programa principal é também um processo (neste caso, trata dos displays)
@@ -399,7 +399,6 @@ pausame:
 ;
 ; FIM - Processo que deteta quando se carrega na tecla de terminar o jogo,
 ;		e termina-o
-;
 ; **********************************************************************
 PROCESS SP_inicial_fim
 fim:
@@ -444,7 +443,7 @@ tempo:
 	CMP R8, R10					; vê se é zero
 	JNZ reseta					; se nao for, entao sai da pausa, continuando o jogo (reseta)
 								
-	troca_para_pausa:			; entra em modo pausa
+troca_para_pausa:			; entra em modo pausa
 	MOV R10, 1					; valor que representa o jogo estar em pausa
 	MOV [PAUSADO], R10			; escreve esse valor
 	MOV  [APAGA_ECRÃ], R4		; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
@@ -452,7 +451,7 @@ tempo:
 	MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
 	JMP pausa					; sai
 
-	reseta:
+reseta:
 	MOV R10, 0					; valor que representa o jogo nao estar em pausa
 	MOV [PAUSADO], R10			; escreve esse valor
 	MOV [APAGA_ECRÃ], R4		; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
@@ -460,237 +459,236 @@ tempo:
 	MOV [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
 	MOV R1, [posicao_tubarao]			; guarda a linha do tubarão
 	MOV	R2, [posicao_tubarao+2]	; guarda a coluna do tubarão
-	MOV	R4, DEF_TUBARAO			; endereço da tabela que define o boneco
-	CALL desenha_boneco			; desenha o tubarão outra vez
+	MOV	R4, DEF_TUBARAO			; endereço da tabela que define o tubarao
+	CALL desenha_tubarao			; desenha o tubarão outra vez
 	JMP pausa					; sai
 
 
 ; **********************************************************************
 ; Processo
 ;
-; TECLADO - Processo que deteta quando se carrega numa tecla na 4ª linha
+; TECLADO - Processo que deteta quando se carrega numa tecla
 ;		  do teclado e escreve o valor da coluna num LOCK.
-;
 ; **********************************************************************
 
-PROCESS SP_inicial_teclado	; indicação de que a rotina que se segue é um processo,
-							; com indicação do valor para inicializar o SP
-teclado:
-DI					; processo que implementa o comportamento do teclado
-	MOV  R2, TEC_LIN		; endereço do periférico das linhas
-	MOV  R3, TEC_COL		; endereço do periférico das colunas
-	MOV  R5, MASCARA		; para isolar os 4 bits de menor peso, ao ler as colunas do teclado
-	MOV  R1, LINHA_TECLADO	; testar a linha 4 
+PROCESS SP_inicial_teclado	
+teclado:					; processo que implementa o comportamento do teclado
+	DI						; desativa as interrupções (geral)
+	MOV R2, TEC_LIN			; endereço do periférico das linhas
+	MOV R3, TEC_COL			; endereço do periférico das colunas
+	MOV R5, MASCARA			; para isolar os 4 bits de menor peso, ao ler as colunas do teclado
+	MOV R1, LINHA_TECLADO	; testar a linha 4 primeiro 
 
-espera_tecla:			; neste ciclo espera-se até uma tecla ser premida
+espera_tecla:				; neste ciclo espera-se até uma tecla ser premida
 
-	YIELD				; este ciclo é potencialmente bloqueante, pelo que tem de
-						; ter um ponto de fuga (aqui pode comutar para outro processo)
+	YIELD					; este ciclo é potencialmente bloqueante, pelo que tem de
+							; ter um ponto de fuga (aqui pode comutar para outro processo)
 	MOV R1, 16
 	proxima_linha:
 	SHR R1, 1
 	JZ espera_tecla
-	MOVB  [R2], R1		; escrever no periférico de saída (linhas)
-	MOVB  R0, [R3]		; ler do periférico de entrada (colunas)
-	AND  R0, R5			; elimina bits para além dos bits 0-3
-	CMP  R0, 0			; há tecla premida?
+	MOVB [R2], R1			; escrever no periférico de saída (linhas)
+	MOVB R0, [R3]			; ler do periférico de entrada (colunas)
+	AND R0, R5				; elimina bits para além dos bits 0-3
+	CMP R0, 0				; há tecla premida?
 
-	JZ  proxima_linha	; se nenhuma tecla premida, repete
+	JZ proxima_linha		; se nenhuma tecla premida, repete
 	MOV R6, R1
-	CALL calcula_output
-	MOV	 [tecla_carregada], R0	; informa quem estiver bloqueado neste LOCK que uma tecla foi carregada
-						; (o valor escrito é o número da coluna da tecla no teclado)
+	CALL calcula_output		; calcula o numero da tecla
+	MOV [tecla_carregada], R0	; informa quem estiver bloqueado neste LOCK que uma tecla foi carregada
+							; (o valor escrito é o número da coluna da tecla no teclado)
 
-ha_tecla:				; neste ciclo espera-se até NENHUMA tecla estar premida
+ha_tecla:					; neste ciclo espera-se até NENHUMA tecla estar premida
 
-	YIELD				; este ciclo é potencialmente bloqueante, pelo que tem de
-						; ter um ponto de fuga (aqui pode comutar para outro processo)
+	YIELD					; este ciclo é potencialmente bloqueante, pelo que tem de
+							; ter um ponto de fuga (aqui pode comutar para outro processo)
 	MOV R1, 16
 	proxima_linhaa:
 	SHR R1, 1
 	JZ ha_tecla
 	MOV R6, R1
-	CALL calcula_output
-	MOV	 [tecla_continuo], R0	; informa quem estiver bloqueado neste LOCK que uma tecla está a ser carregada
-								; (o valor escrito é o número da coluna da tecla no teclado)
-    MOVB  [R2], R1				; escrever no periférico de saída (linhas)
-    MOVB  R0, [R3]				; ler do periférico de entrada (colunas)
-	AND  R0, R5			; elimina bits para além dos bits 0-3
-    CMP  R0, 0			; há tecla premida?
-    JNZ  proxima_linhaa		; se ainda houver uma tecla premida, espera até não haver
+	CALL calcula_output		; calcula o numero da tecla
+	MOV	[tecla_continuo], R0	; informa quem estiver bloqueado neste LOCK que uma tecla está a ser carregada
+							; (o valor escrito é o número da coluna da tecla no teclado)
+    MOVB [R2], R1			; escrever no periférico de saída (linhas)
+    MOVB R0, [R3]			; ler do periférico de entrada (colunas)
+	AND R0, R5				; elimina bits para além dos bits 0-3
+    CMP R0, 0				; há tecla premida?
+    JNZ proxima_linhaa		; se ainda houver uma tecla premida, espera até não haver
 
-	JMP	espera_tecla	; esta "rotina" nunca retorna porque nunca termina
-						; Se se quisesse terminar o processo, era deixar o processo chegar a um RET
+	JMP	espera_tecla		; esta "rotina" nunca retorna porque nunca termina
 
 
 ; **********************************************************************
 ; Processo
 ;
-; ENERGIA -
+; ENERGIA - Processo que deteta quando é para decrementar a energia
 ;
 ; **********************************************************************
 PROCESS SP_inicial_energia
 	
-	energia:
-		DI
-		YIELD
-		MOV	R0,[evento_int_energia]
-		MOV R0,[ENERGIA]
-		CMP R0,0
-		JZ	parar
-		CALL desincrementa_energia
-		JMP energia
-		parar:
-		CALL game_over
+energia:						; processo que decrementa a energia
+	DI							; desativa as interrupções (geral)
+	YIELD				
+	MOV	R0, [evento_int_energia]; le o valor da interrupção
+	MOV R0, [ENERGIA]			; le o valor da energia
+	CMP R0, 0					; se for zero, fim de jogo
+	JZparar					
+	CALL desincrementa_energia	; decrementa a energia
+	JMP energia					; sai
+parar:
+	CALL fim_de_jogo			; fim de jogo
 
 
 ; **********************************************************************
 ; Processo
 ;
-; BONECO - Processo que desenha um boneco e o move horizontalmente, com
+; TUBARAO - Processo que desenha um tubarão e o move horizontalmente, com
 ;		 temporização marcada pela interrupção 0
-;
 ; **********************************************************************
 
-PROCESS SP_inicial_boneco	; indicação de que a rotina que se segue é um processo,
-							; com indicação do valor para inicializar o SP
-boneco:
-	DI						; processo que implementa o comportamento do boneco
-	; desenha o boneco na sua posição inicial
-    MOV  R1, LINHA			; linha do boneco
-	MOV	 R2, COLUNA
-	MOV	 R4, DEF_TUBARAO		; endereço da tabela que define o boneco
-	MOV  R5, 8				; atraso
-ciclo_boneco:
-	CALL  desenha_boneco	; desenha o boneco a partir da tabela
+PROCESS SP_inicial_tubarao	
+tubarao:					; processo que implementa o comportamento do tubarao
+	DI						; desativa as interrupções (geral)
+	; desenha o tubarao na sua posição inicial
+    MOV R1, LINHA			; linha do tubarão
+	MOV	R2, COLUNA			; coluna do tubarão
+	MOV	R4, DEF_TUBARAO		; endereço da tabela que define o tubarao
+	MOV R5, 8				; atraso do tubarão
+
+ciclo_tubarao:
+	CALL desenha_tubarao	; desenha o tubarao a partir da tabela
 espera_movimento:
 
 testa_mover_direita:
-	MOV	 R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
-	MOV R9,TECLA_E
-	CMP	 R3, R9			; é a coluna da tecla E?
-	JZ  move_direita
+	MOV	R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
+	MOV R9, TECLA_E			; tecla para andar para a direita
+	CMP	R3, R9				; é a tecla para andar para a direita?
+	JZ move_direita			; se sim, move
 
 testa_mover_esquerda:
-	MOV	 R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
-	MOV R9,TECLA_D
-	CMP	 R3, R9		; é a coluna da tecla E?
-	JZ  move_esquerda
-	JNZ	 espera_movimento	; se não é, ignora e continua à espera
+	MOV	R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
+	MOV R9, TECLA_D			; tecla para andar para a esquerda
+	CMP	R3, R9				; é a tecla para andar para a esquerda?
+	JZ move_esquerda		; se sim, move
+	JNZ espera_movimento	; se não é, ignora e continua à espera
 
 move_direita:
-
-	MOV	 R7, +1				; vai deslocar para a esquerda
-	JMP  move
+	MOV	R7, +1				; vai deslocar para a direita
+	JMP move	
 move_esquerda:
-	MOV	 R7, -1
-	JMP  move
+	MOV	R7, -1				; vai deslocar para a esquerda
+	JMP move
 move:
-	SUB  R5, 1				; subtrai uma unidade ao atraso
-	CMP  R5, 0				; ve se é igual a 0
-	JNZ  ciclo_boneco		; se nao é, nao move ainda
-	MOV  R5, 8				; se é, repoem o valor e vai mover
-	CALL  apaga_boneco		; apaga o boneco na sua posição corrente
+	SUB R5, 1				; subtrai uma unidade ao atraso
+	CMP R5, 0				; ve se é igual a 0
+	JNZ ciclo_tubarao		; se nao é, nao move ainda
+	MOV R5, 8				; se é, repoem o valor e vai mover
+	CALL apaga_tubarao		; apaga o tubarao na sua posição corrente
 	
-	MOV	 R6, [R4]			; obtém a largura do boneco
-	CALL  testa_limites		; vê se chegou aos limites do ecrã e nesse caso inverte o sentido
-	ADD	 R2, R7				; para desenhar objeto na coluna seguinte (direita ou esquerda)
-	MOV[posicao_tubarao],R1
-	MOV[posicao_tubarao+2],R2
-	JMP	 ciclo_boneco		; esta "rotina" nunca retorna porque nunca termina
-							; Se se quisesse terminar o processo, era deixar o processo chegar a um RET
+	MOV	R6, [R4]			; obtém a largura do tubarao
+	CALL testa_limites		; vê se chegou aos limites do ecrã e nesse caso inverte o sentido
+	ADD	R2, R7				; para desenhar objeto na coluna seguinte (direita ou esquerda)
+	MOV[posicao_tubarao], R1 ; guarda a posicao da linha do tubarão
+	MOV[posicao_tubarao+2], R2 ; guarda a posicao da coluna do tubarão
+	JMP	ciclo_tubarao
+
 
 ; **********************************************************************
-; DESENHA_BONECO - Desenha um boneco na linha e coluna indicadas
+; * ROTINAS                                                            
+; **********************************************************************
+
+; **********************************************************************
+; DESENHA_tubarao - Desenha um tubarao na linha e coluna indicadas
 ;			    com a forma e cor definidas na tabela indicada.
 ; Argumentos:   R1 - linha
 ;               R2 - coluna
-;               R4 - tabela que define o boneco
+;               R4 - tabela que define o tubarao
 ;
 ; **********************************************************************
-desenha_boneco:
-	PUSH  R1
-	PUSH  R2
-	PUSH  R3
-	PUSH  R4
-	PUSH  R5
-	PUSH  R6
-	PUSH  R7
-	PUSH  R8
-	MOV  R8,R2
-	MOV  R7, [R4]				; obtém a largura do boneco
-	MOV  R5,R7
-	ADD	 R4, 2			
-	MOV	 R6, [R4]				; obtém a altura do boneco	
-	ADD	 R4, 2					; endereço da cor do 1º pixel (2 porque a largura é uma word)
-desenha_pixels:       			; desenha os pixels do boneco a partir da tabela
-	MOV	 R3, [R4]				; obtém a cor do próximo pixel do boneco
-	CALL  escreve_pixel		; escreve cada pixel do boneco
-	ADD	 R4, 2					; endereço da cor do próximo pixel (2 porque cada cor de pixel é uma word)
-    ADD  R2, 1                  ; próxima coluna
-    SUB  R5, 1					; menos uma coluna para tratar
-    JNZ  desenha_pixels         ; continua até percorrer toda a largura do objeto
+desenha_tubarao:
+	PUSH R1
+	PUSH R2
+	PUSH R3
+	PUSH R4
+	PUSH R5
+	PUSH R6
+	PUSH R7
+	PUSH R8
+	MOV R8, R2
+	MOV R7, [R4]				; obtém a largura do tubarao
+	MOV R5, R7
+	ADD	R4, 2			
+	MOV	R6, [R4]				; obtém a altura do tubarao	
+	ADD	R4, 2					; endereço da cor do 1º pixel (2 porque a largura é uma word)
+desenha_pixels:       			; desenha os pixels do tubarao a partir da tabela
+	MOV	R3, [R4]				; obtém a cor do próximo pixel do tubarao
+	CALL escreve_pixel			; escreve cada pixel do tubarao
+	ADD	R4, 2					; endereço da cor do próximo pixel (2 porque cada cor de pixel é uma word)
+    ADD R2, 1                   ; próxima coluna
+    SUB R5, 1					; menos uma coluna para tratar
+    JNZ desenha_pixels          ; continua até percorrer toda a largura do objeto
 	;troca de linha
-	MOV  R2,R8
-	MOV  R5,R7
-	ADD  R1,1
-	SUB  R6, 1
-	JNZ  desenha_pixels
+	MOV R2, R8 
+	MOV R5, R7
+	ADD R1, 1
+	SUB R6, 1
+	JNZ desenha_pixels
 	
-	POP  R8 
-	POP  R7
-	POP  R6
-	POP	 R5
-	POP	 R4
-	POP	 R3
-	POP	 R2
-	POP  R1
+	POP R8 
+	POP R7
+	POP R6
+	POP	R5
+	POP	R4
+	POP	R3
+	POP	R2
+	POP R1
 	RET
 
 ; **********************************************************************
-; APAGA_BONECO - Apaga um boneco na linha e coluna indicadas
-;			  com a forma definida na tabela indicada.
+; APAGA_tubarao - Apaga um tubarao na linha e coluna indicadas
+;			 	 com a forma definida na tabela indicada.
 ; Argumentos:   R1 - linha
 ;               R2 - coluna
-;               R4 - tabela que define o boneco
+;               R4 - tabela que define o tubarao
 ;
 ; **********************************************************************
-apaga_boneco:
-	PUSH  R1
-	PUSH  R2
-	PUSH  R3
-	PUSH  R4
-	PUSH  R5
-	PUSH  R6
-	PUSH  R7
-	PUSH  R8
-	MOV  R8,R2
-	MOV	 R7, [R4]				; obtém a largura do boneco
-	MOV  R5,R7
-	ADD	 R4, 2			
-	MOV	 R6, [R4]				; obtém a altura do boneco	
-	ADD	 R4, 2					; endereço da cor do 1º pixel (2 porque a largura é uma word)
-apaga_pixels:       			; desenha os pixels do boneco a partir da tabela
-	MOV	 R3, 0					; obtém a cor do próximo pixel do boneco
-	CALL  escreve_pixel			; escreve cada pixel do boneco
-	ADD	 R4, 2					; endereço da cor do próximo pixel (2 porque cada cor de pixel é uma word)
-    ADD  R2, 1                  ; próxima coluna
-    SUB  R5, 1					; menos uma coluna para tratar
-    JNZ  apaga_pixels           ; continua até percorrer toda a largura do objeto
+apaga_tubarao:
+	PUSH R1
+	PUSH R2
+	PUSH R3
+	PUSH R4
+	PUSH R5
+	PUSH R6
+	PUSH R7
+	PUSH R8
+	MOV R8, R2
+	MOV	R7, [R4]				; obtém a largura do tubarao
+	MOV R5, R7
+	ADD	R4, 2			
+	MOV	R6, [R4]				; obtém a altura do tubarao	
+	ADD	R4, 2					; endereço da cor do 1º pixel (2 porque a largura é uma word)
+apaga_pixels:       			; desenha os pixels do tubarao a partir da tabela
+	MOV	R3, 0					; obtém a cor do próximo pixel do tubarao
+	CALL escreve_pixel			; escreve cada pixel do tubarao
+	ADD	R4, 2					; endereço da cor do próximo pixel (2 porque cada cor de pixel é uma word)
+    ADD R2, 1                   ; próxima coluna
+    SUB R5, 1					; menos uma coluna para tratar
+    JNZ apaga_pixels            ; continua até percorrer toda a largura do objeto
 	;troca de linha
-	MOV  R2,R8
-	MOV  R5,R7
-	ADD  R1,1
-	SUB  R6, 1
-	JNZ  apaga_pixels
-	POP  R8 
-	POP  R7
-	POP  R6
-	POP	 R5
-	POP	 R4
-	POP  R3
-	POP	 R2
-	POP  R1
+	MOV R2,R8
+	MOV R5,R7
+	ADD R1,1
+	SUB R6, 1
+	JNZ apaga_pixels
+	POP R8 
+	POP R7
+	POP R6
+	POP	R5
+	POP	R4
+	POP R3
+	POP	R2
+	POP R1
 	RET
 
 ;processo missil================================================================
@@ -707,8 +705,8 @@ espera_tecla_disparar:
 	MOV R2,[posicao_tubarao+2]
 	ADD R2,2
 	MOV  R1,[posicao_tubarao]
-	SUB  R1, 1			; linha do boneco
-	MOV	 R4, DEF_MISSIL		; endereço da tabela que define o boneco
+	SUB  R1, 1			; linha do tubarao
+	MOV	 R4, DEF_MISSIL		; endereço da tabela que define o tubarao
 	
 	CMP	 R3, R9			; é a coluna da tecla E?
 	
@@ -722,7 +720,7 @@ ciclo_missil_energia:
 	SUB R11, R10				; subtrai o valor a decrementar
 	MOV [ENERGIA], R11		; escreve o novo valor da energia	
 ciclo_missil:
-	CALL  desenha_MISSIL	; desenha o boneco a partir da tabela
+	CALL  desenha_MISSIL	; desenha o tubarao a partir da tabela
 
 	MOV	 R3, [missil_anda]
 Testa_top:
@@ -736,9 +734,9 @@ Testa_top:
 	MOV[posicao_missil+2],R2
 	JMP missil
 sobe_missil:
-	CALL  apaga_MISSIL		; apaga o boneco na sua posição corrente
+	CALL  apaga_MISSIL		; apaga o tubarao na sua posição corrente
 	
-	MOV	 R6, [R4]			; obtém a largura do boneco
+	MOV	 R6, [R4]			; obtém a largura do tubarao
 	SUB	 R1, 1				; para desenhar objeto na coluna seguinte (direita ou esquerda)
 	MOV[posicao_missil],R1
 	MOV[posicao_missil+2],R2
@@ -778,7 +776,7 @@ mina:
 	MOV R7,8
 	MUL R4,R7
 	MOV  [R9+R10],R4
-	MOV  R2, [R9+R10]			; linha do boneco
+	MOV  R2, [R9+R10]			; linha do tubarao
 	MOV R9,linha_minas
 	
 	MOV	 R1, [R9+R10]
@@ -901,7 +899,7 @@ verifica_colisao_tubarao:
 	ADD R10,5
 	CMP R8,R10
 	JGT ciclo_mina
-	JMP game_over
+	JMP fim_de_jogo
 
 
 peixe:
@@ -914,7 +912,7 @@ peixe:
 	MOV R7,8
 	MUL R4,R7
 	MOV  [R9+R10],R4
-	MOV  R2, [R9+R10]			; linha do boneco
+	MOV  R2, [R9+R10]			; linha do tubarao
 	MOV R9,linha_minas
 	
 	MOV	 R1, [R9+R10]
@@ -1062,10 +1060,10 @@ desenha_mina:
 	PUSH  R7
 	PUSH  R8
 	MOV  R8,R2
-	MOV  R7, [R4]				; obtém a largura do boneco
+	MOV  R7, [R4]				; obtém a largura do tubarao
 	MOV  R5,5
 	ADD	 R4, 2			
-	MOV	 R6, 6				; obtém a altura do boneco	
+	MOV	 R6, 6				; obtém a altura do tubarao	
 	ADD	 R4, 2					; endereço da cor do 1º pixel (2 porque a largura é uma word)
 	JMP desenha_pixels
 	RET
@@ -1088,10 +1086,10 @@ apaga_mina:
 	PUSH  R7
 	PUSH  R8
 	MOV  R8,R2
-	MOV	 R7, [R4]				; obtém a largura do boneco
+	MOV	 R7, [R4]				; obtém a largura do tubarao
 	MOV  R5,5
 	ADD	 R4, 2			
-	MOV	 R6, [R4]				; obtém a altura do boneco	
+	MOV	 R6, [R4]				; obtém a altura do tubarao	
 	ADD	 R4, 5					; endereço da cor do 1º pixel (2 porque a largura é uma word)
 	JMP apaga_pixels
 	RET
@@ -1107,11 +1105,11 @@ escreve_pixel:
 
 
 ; **********************************************************************
-; TESTA_LIMITES - Testa se o boneco chegou aos limites do ecrã e nesse caso
+; TESTA_LIMITES - Testa se o tubarao chegou aos limites do ecrã e nesse caso
 ;			   inverte o sentido de movimento
 ; Argumentos:	R2 - coluna em que o objeto está
-;			R6 - largura do boneco
-;			R7 - sentido de movimento do boneco (valor a somar à coluna
+;			R6 - largura do tubarao
+;			R7 - sentido de movimento do tubarao (valor a somar à coluna
 ;				em cada movimento: +1 para a direita, -1 para a esquerda)
 ;
 ; Retorna: 	R7 - novo sentido de movimento (pode ser o mesmo)	
@@ -1119,15 +1117,15 @@ escreve_pixel:
 testa_limites:
 	PUSH  R5
 	PUSH  R6
-testa_limite_esquerdo:			; vê se o boneco chegou ao limite esquerdo
+testa_limite_esquerdo:			; vê se o tubarao chegou ao limite esquerdo
 	MOV	 R5, MIN_COLUNA
 	CMP	 R2, R5
 	JGT	 testa_limite_direito
 	CMP	 R7, 0					; passa a deslocar-se para a direita
 	JGE	 sai_testa_limites
 	JMP	 impede_movimento		; entre limites. Mantém o valor do R7
-testa_limite_direito:			; vê se o boneco chegou ao limite direito
-	ADD	 R6, R2					; posição a seguir ao extremo direito do boneco
+testa_limite_direito:			; vê se o tubarao chegou ao limite direito
+	ADD	 R6, R2					; posição a seguir ao extremo direito do tubarao
 	MOV	 R5, MAX_COLUNA
 	CMP	 R6, R5
 	JLE	 sai_testa_limites		; entre limites. Mantém o valor do R7
@@ -1144,12 +1142,12 @@ sai_testa_limites:
 
 ;rotina game over
 
-game_over:
+fim_de_jogo:
     MOV  [APAGA_ECRÃ], R1	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
 	MOV	 R1, 1				; cenário de fundo número 0
     MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
-	ciclo_game_over:
-	JMP ciclo_game_over
+	ciclo_fim_de_jogo:
+	JMP ciclo_fim_de_jogo
 	RET
 
 ; **********************************************************************
