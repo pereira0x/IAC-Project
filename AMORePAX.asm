@@ -451,15 +451,19 @@ tempo:
 	CMP R8, R10					; vê se é zero
 	JNZ reseta					; se nao for, entao sai da pausa, continuando o jogo (reseta)
 								
-troca_para_pausa:			; entra em modo pausa
+troca_para_pausa:				; entra em modo pausa
+	MOV R9,4			;		 seleciona o som 4
+	MOV [TOCA_SOM],R9			; toca o som
 	MOV R10, 1					; valor que representa o jogo estar em pausa
 	MOV [PAUSADO], R10			; escreve esse valor
-	MOV  [APAGA_ECRÃ], R4		; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
-	MOV	 R1, 3					; cenário de fundo número 3
-	MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+	MOV [APAGA_ECRÃ], R4		; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
+	MOV	R1, 3					; cenário de fundo número 3
+	MOV [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
 	JMP pausa					; sai
 
 reseta:
+	MOV R9,4			;		 seleciona o som 4
+	MOV [TOCA_SOM],R9			; toca o som
 	MOV R10, 0					; valor que representa o jogo nao estar em pausa
 	MOV [PAUSADO], R10			; escreve esse valor
 	MOV [APAGA_ECRÃ], R4		; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
@@ -630,6 +634,8 @@ espera_tecla_disparar:
 
 
 ciclo_missil_energia:
+	MOV R9, 2					; seleciona o som 2
+	MOV [TOCA_SOM], R9			; toca o som
 	MOV R10, ENERGIA_MISSIL_VALOR	; valor a decrementar
 	MOV R11, [ENERGIA]			; leitura do valora atual da energia
 	SUB R11, R10				; subtrai o valor a decrementar
@@ -820,7 +826,8 @@ verifica_colisao_tubarao:		; verifica se a mina colidiu com um tubarão
 	ADD R10, 5
 	CMP R8, R10
 	JGT ciclo_mina
-
+	MOV R9,3			; seleciona o som 3
+	MOV [TOCA_SOM],R9	; toca o som
 	JMP fim_de_jogo				; se houve colisão, perde o jogo
 
 
@@ -955,6 +962,8 @@ verifica_colisao_tubarao_peixe: ; verifica a colisão do peixe com o tubarão
 	JGT ciclo_peixe
 
 	CALL incrementa_energia_peixe	; incrementa a energia
+	MOV R9,1			; seleciona o som 1
+	MOV [TOCA_SOM],R9	; toca o som
 	JMP mina
 
 ; **********************************************************************
@@ -1195,7 +1204,7 @@ incrementa_energia:
 	JGT max_100				; se sim, limite a 100
 	MOV [ENERGIA], R1		; escreve o novo valor da energia
 
-	PUSH R2
+	POP R2
 	POP R1
 	POP R0
 	RET
