@@ -68,7 +68,9 @@ DECIMAL_1000	EQU 03E8H	   ; numero 1000 em hexadecimal
 MAX_OBJETOS		EQU 4		   ; numero maximo de minas em tela
 DECREMENTA_ENERGIA_VALOR EQU 5 ; valor a decrementar à energia
 DECREMENTA_MISSIL_VALOR  EQU 5 ; valor a decrementar à energia quando um missil destroi uma mina
-DECREMENTA_ENERGIA_VALOR_XL EQU 10 ; valor a decrementar à energia quando o tubarao come um peixeç
+DECREMENTA_ENERGIA_VALOR_XL EQU 10 ; valor a decrementar à energia quando o tubarao come um peixe
+
+PAUSA_TIME		EQU 04AFH	   ; valor entre pausas
 
 
 ; *********************************************************************************
@@ -382,7 +384,7 @@ atualiza_display:			; atualiza o display com a energia
 	JNZ pausame				; se nao for zero, vai pausar
 	EI						; ativa as interrupções (geral)
 checkpoint1:	
-	MOV  [R0], R5           ; mostra o valor do contador nos displays
+	MOV [R0], R5           ; mostra o valor do contador nos displays
 	YIELD
 	JMP display_setup
 
@@ -402,59 +404,65 @@ pausame:
 PROCESS SP_inicial_fim
 fim:
 YIELD
-	MOV	 R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
+	MOV	R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
 	MOV R9,TECLA_2				; tecla para terminar o jogo
-	CMP	 R3, R9					; é a tecla para terminar o jogo?
+	CMP	R3, R9					; é a tecla para terminar o jogo?
 	JNZ fim						; se náo é, sai
-	MOV R10, 1					; se 
-	MOV  [APAGA_ECRÃ], R4	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
-	MOV	 R1, 4				; cenário de fundo número 0
-	MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
-fim_loop:
+	MOV [APAGA_ECRÃ], R4		; se, é: apaga todos os pixels já desenhados (o valor de R1 não é relevante)
+	MOV	R1, 4					; cenário de fundo número 4
+	MOV [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+fim_loop:						; fica aqui para sempre
 	JMP fim_loop
 
 
 
 
 
-; **************************************************+
+; **********************************************************************
+; Processo
+;
+; Pausa - Processo que deteta quando se carrega na tecla de pausar o jogo,
+;		  e pausa o jogo, ou continua caso este ja esteja pausado.
+; **********************************************************************
 PROCESS SP_inicial_pausa
 pausa:
-	MOV R1, 04AFH
+	MOV R1, PAUSA_TIME  ; valor a esperar entre pausas, de forma nao bloqueante
 tempo:
 	YIELD
 	
-	SUB R1, 1
-	JNZ tempo
+	SUB R1, 1					; subtrai uma unidade
+	JNZ tempo					; se nao for zero, repete			
+	MOV	R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
+	MOV R11, [tecla_continuo]	; lê o LOCK da tecla continua
+	CMP R11, 0					; ve se é zero
+	JZ pausa					; se for, repete
+	MOV R9,TECLA_1				; tecla para pausar o jogo
+	CMP	R3, R9					; é a tecla para pausar o jogo?
+	JNZ pausa					; se nao for, sai
+	MOV R8, [PAUSADO]			; ve o estado de pausa do jogo
 	MOV R10, 0
-	MOV	 R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
-	MOV R11, [tecla_continuo]
-	CMP R11, 0
-	JZ pausa
-	MOV R9,TECLA_1
-	CMP	 R3, R9			; é a coluna da tecla 1?
-	JNZ pausa
-	MOV R8, [PAUSADO]
-	CMP R8, R10
-	JNZ reseta
-	troca_para_pausa:
-		MOV R10, 1
-		MOV [PAUSADO], R10
-		MOV  [APAGA_ECRÃ], R4	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
-		MOV	 R1, 3				; cenário de fundo número 0
-		MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
-		JMP pausa
+	CMP R8, R10					; vê se é zero
+	JNZ reseta					; se nao for, entao sai da pausa, continuando o jogo (reseta)
+								
+	troca_para_pausa:			; entra em modo pausa
+	MOV R10, 1					; valor que representa o jogo estar em pausa
+	MOV [PAUSADO], R10			; escreve esse valor
+	MOV  [APAGA_ECRÃ], R4		; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
+	MOV	 R1, 3					; cenário de fundo número 3
+	MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+	JMP pausa					; sai
+
 	reseta:
-		MOV R10, 0
-		MOV [PAUSADO], R10
-		MOV  [APAGA_ECRÃ], R4	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
-		MOV	 R1, 0				; cenário de fundo número 0
-		MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
-		MOV  R1, [posicao_tubarao]			; linha do boneco
-		MOV	 R2, [posicao_tubarao+2]
-		MOV	 R4, DEF_TUBARAO		; endereço da tabela que define o boneco
-		CALL desenha_boneco
-		JMP pausa
+	MOV R10, 0					; valor que representa o jogo nao estar em pausa
+	MOV [PAUSADO], R10			; escreve esse valor
+	MOV [APAGA_ECRÃ], R4		; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
+	MOV	R1, 0					; cenário de fundo número 0
+	MOV [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+	MOV R1, [posicao_tubarao]			; guarda a linha do tubarão
+	MOV	R2, [posicao_tubarao+2]	; guarda a coluna do tubarão
+	MOV	R4, DEF_TUBARAO			; endereço da tabela que define o boneco
+	CALL desenha_boneco			; desenha o tubarão outra vez
+	JMP pausa					; sai
 
 
 ; **********************************************************************
