@@ -71,6 +71,8 @@ DECREMENTA_MISSIL_VALOR  EQU 5 ; valor a decrementar à energia quando um missil
 DECREMENTA_ENERGIA_VALOR_XL EQU 10 ; valor a decrementar à energia quando o tubarao come um peixe
 
 PAUSA_TIME		EQU 04AFH	   ; valor entre pausas
+LIMITE_MISSIL   EQU 15		   ; valor do limite do missil
+FORA_DO_ECRA    EQU 200        ; posicao fora do ecra do missil
 
 
 ; *********************************************************************************
@@ -124,16 +126,16 @@ coluna_minas:			; colunas iniciais em que cada mina está
 	WORD 46
 
 posicao_missil:			; posicao inicial do missil
-	WORD 200
-	WORD 200
+	WORD FORA_DO_ECRA
+	WORD FORA_DO_ECRA
 
 posicao_tubarao:		; posicao incial do tubarão
 	WORD LINHA
 	WORD COLUNA
 
 posicao_explosao:		; posicao incial da explosao
-	WORD 200
-	WORD 200			 
+	WORD FORA_DO_ECRA
+	WORD FORA_DO_ECRA			 
 
 objetosSP_tab:				; varias instancias dos objetos
 	WORD SP_inicial_objeto0
@@ -533,7 +535,7 @@ energia:						; processo que decrementa a energia
 	MOV	R0, [evento_int_energia]; le o valor da interrupção
 	MOV R0, [ENERGIA]			; le o valor da energia
 	CMP R0, 0					; se for zero, fim de jogo
-	JZparar					
+	JZ parar					
 	CALL desincrementa_energia	; decrementa a energia
 	JMP energia					; sai
 parar:
@@ -593,6 +595,77 @@ move:
 	MOV[posicao_tubarao+2], R2 ; guarda a posicao da coluna do tubarão
 	JMP	ciclo_tubarao
 
+
+
+; **********************************************************************
+; Processo
+;
+; MISSIL - Processo que desenha um um missil, e o movimento horizontalmente
+; 			temporizado com a interrupção 1
+; **********************************************************************
+PROCESS SP_inicial_missil
+
+missil:
+	; desenha o missil na sua posição inicial
+espera_tecla_disparar:
+	MOV	R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
+	MOV R9,TECLA_C				; tecla para disparar o missil
+	
+	MOV R2,[posicao_tubarao+2]	; posição do tubarão(coluna)
+	ADD R2,2					
+	MOV R1,[posicao_tubarao]	; posição do tubarão (linha)
+	SUB R1, 1					; linha do tubarao
+	MOV	R4, DEF_MISSIL			; endereço da tabela que define o missil
+	
+	CMP	R3, R9					; é a coluna para disparar o missil?
+		
+	JZ ciclo_missil_energia		; se for, vai remover o custo de energia do missil	
+	JMP espera_tecla_disparar	; se nao for, sai
+
+
+ciclo_missil_energia:
+	MOV R10, DECREMENTA_MISSIL_VALOR	; valor a decrementar
+	MOV R11, [ENERGIA]			; leitura do valora atual da energia
+	SUB R11, R10				; subtrai o valor a decrementar
+	MOV [ENERGIA], R11			; escreve o novo valor da energia
+	
+ciclo_missil:
+	CALL desenha_MISSIL			; desenha o missil a partir da tabela
+
+	MOV	R3, [missil_anda]		; LOCK para mover o missil
+
+Testa_top:						; testa o limite maximo superior do missil
+	MOV R6,LIMITE_MISSIL		; linha maxima do missil
+	CMP R1,R6					; ve se esta no limite
+	JNZ sobe_missil				; se nao estiver no limite, sobre
+	CALL apaga_MISSIL			; se estiver, apaga o missil
+	MOV R1, FORA_DO_ECRA		; tira o missil (linhas)
+	MOV R2, FORA_DO_ECRA		; tira o missil (colunas)
+	MOV[posicao_missil], R1		; guarda o valor da linha do missil
+	MOV[posicao_missil+2], R2	; guarda o valor da coluna do missil
+	JMP missil					; repete
+
+sobe_missil:	
+	CALL apaga_MISSIL		; apaga o missil na sua posição corrente
+	MOV	R6, [R4]			; obtém a largura do missil
+	SUB	R1, 1				; para desenhar objeto na linha seguinte
+	MOV[posicao_missil], R1	; guarda a posicão (linha) do missil
+	MOV[posicao_missil+2], R2; guarda a posição (coluna) do missil
+	JMP	 ciclo_missil		
+
+desenha_MISSIL:
+	PUSH R3
+	MOV R3, 0FB00H ; cor do missil
+	CALL escreve_pixel
+	POP R3
+	RET
+
+apaga_MISSIL:
+	PUSH R3
+	MOV R3, 0 ; cor do missil
+	CALL escreve_pixel
+	POP R3
+	RET
 
 ; **********************************************************************
 ; * ROTINAS                                                            
@@ -690,75 +763,6 @@ apaga_pixels:       			; desenha os pixels do tubarao a partir da tabela
 	POP	R2
 	POP R1
 	RET
-
-;processo missil================================================================
-PROCESS SP_inicial_missil
-
-missil:
-	; desenha o missil na sua posição inicial
-
-
-espera_tecla_disparar:
-	MOV	 R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
-	MOV R9,TECLA_C
-	
-	MOV R2,[posicao_tubarao+2]
-	ADD R2,2
-	MOV  R1,[posicao_tubarao]
-	SUB  R1, 1			; linha do tubarao
-	MOV	 R4, DEF_MISSIL		; endereço da tabela que define o tubarao
-	
-	CMP	 R3, R9			; é a coluna da tecla E?
-	
-	JZ  ciclo_missil_energia	
-	JMP espera_tecla_disparar
-
-
-ciclo_missil_energia:
-	MOV R10, DECREMENTA_MISSIL_VALOR	; valor a decrementar
-	MOV R11, [ENERGIA]		; leitura do valora atual da energia
-	SUB R11, R10				; subtrai o valor a decrementar
-	MOV [ENERGIA], R11		; escreve o novo valor da energia	
-ciclo_missil:
-	CALL  desenha_MISSIL	; desenha o tubarao a partir da tabela
-
-	MOV	 R3, [missil_anda]
-Testa_top:
-	MOV R6,15
-	CMP R1,R6
-	JNZ sobe_missil
-	CALL apaga_MISSIL
-	MOV R1,200
-	MOV R2,200
-	MOV[posicao_missil],R1
-	MOV[posicao_missil+2],R2
-	JMP missil
-sobe_missil:
-	CALL  apaga_MISSIL		; apaga o tubarao na sua posição corrente
-	
-	MOV	 R6, [R4]			; obtém a largura do tubarao
-	SUB	 R1, 1				; para desenhar objeto na coluna seguinte (direita ou esquerda)
-	MOV[posicao_missil],R1
-	MOV[posicao_missil+2],R2
-	JMP	 ciclo_missil		; esta "rotina" nunca retorna porque nunca termina
-							; Se se quisesse terminar o processo, era deixar o processo chegar a um RET
-
-desenha_MISSIL:
-	PUSH R3
-	MOV R3,0FB00H ; COR DO MISSIL
-	CALL escreve_pixel
-	POP R3
-	RET
-
-apaga_MISSIL:
-	PUSH R3
-	MOV R3,0 ; COR DO MISSIL
-	CALL escreve_pixel
-	POP R3
-	RET
-
-
-
 
 ;processo mina==========================================================
 PROCESS SP_inicial_objeto0
