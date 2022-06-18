@@ -158,8 +158,8 @@ objetosSP_tab:				; varias instancias dos objetos
 
 BTE_START:
 	WORD movimenta_objeto		; interrupção da mina
-	WORD movimenta_missil	; interrupção do missil
-	WORD interrupt_energia  ; interrupção da energia
+	WORD movimenta_missil		; interrupção do missil
+	WORD interrupt_energia  	; interrupção da energia
 	WORD 0
 
 tecla_carregada:
@@ -336,6 +336,9 @@ ENERGIA: WORD DECIMAL_100	; variavel global do valor da energia
 PAUSADO: WORD 0				; variavel global para verificar se o jogo esta em pausa
 POSICAO_EXPLOSAO: WORD 0	; variavel global da posição da explosão
 EXPLOSAO_ACONTECEU: WORD 0	; variavel global para ver se existe uma explosão
+RESET: WORD 0				; variavel global para dizer que houve um reset
+MORTE: WORD 0				; variavel global para dizer que houve um morte
+RESET2: WORD 0				; variavel global auxiliar para dizer que houve um reset
 ; *********************************************************************************
 ; * Código
 ; *********************************************************************************
@@ -350,13 +353,26 @@ inicio:
                             
     MOV [APAGA_AVISO], R1	; apaga o aviso de nenhum cenário selecionado (o valor de R1 não é relevante)
     MOV [APAGA_ECRÃ], R1	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
-	MOV	R1, 0				; cenário de fundo número 0
+	MOV	R1, 2				; cenário de fundo número 0
     MOV [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
 	MOV	R7, 1				; valor a somar à coluna do tubarao, para o movimentar
      
 	; cria processos. O CALL não invoca a rotina, apenas cria um processo executável
 	CALL teclado			; cria o processo teclado
-	CALL tubarao				; cria o processo tubarao
+	; tela de começo
+comecar:
+	YIELD
+	MOV	R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
+	MOV R9,TECLA_3				; tecla para começar o jogo
+	CMP	R3, R9					; é a tecla para começar o jogo?
+	JNZ comecar					; se nao for, ainda nao começa
+
+	MOV [APAGA_ECRÃ], R4		; se, é: apaga todos os pixels já desenhados (o valor de R4 não é relevante)
+	MOV	R1, 0					; cenário de fundo número 0
+	MOV [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+
+
+	CALL tubarao			; cria o processo tubarao
 	CALL missil				; cria o processo missil
 	CALL energia			; cria o processo energia
 	CALL pausa				; cria o processo pausa
@@ -393,8 +409,11 @@ calcula_decimal:			; converte a energia de hexadecimal para decimal
 
 atualiza_display:			; atualiza o display com a energia
 	MOV R8, [PAUSADO]		; lê a variavel do estado de pausa do jogo
-	MOV R10, 0				
+	MOV R9, [MORTE]			; lê a variavel do estado de morte do jogo
+	MOV R10, 0				; valor de nao morte
 	CMP R8, R10				; ve se a variavel é 0
+	JNZ pausame				; se nao for zero, vai pausar
+	CMP R9, R10				; ve se a variavel é 0
 	JNZ pausame				; se nao for zero, vai pausar
 	EI						; ativa as interrupções (geral)
 checkpoint1:	
@@ -418,14 +437,41 @@ PROCESS SP_inicial_fim
 fim:
 YIELD
 	MOV	R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
+	MOV R1, [MORTE]				; lê o valor do estado de morte
+	CMP R1, 1					; ve se o estado de morte é 1
+	JZ modo_fim					; se sim, vai para o modo fim de jogo
 	MOV R9,TECLA_2				; tecla para terminar o jogo
 	CMP	R3, R9					; é a tecla para terminar o jogo?
 	JNZ fim						; se náo é, sai
+modo_fim:
 	MOV [APAGA_ECRÃ], R4		; se, é: apaga todos os pixels já desenhados (o valor de R1 não é relevante)
-	MOV	R1, 4					; cenário de fundo número 4
+	MOV	R1, 1					; cenário de fundo número 0
 	MOV [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
-fim_loop:						; fica aqui para sempre
-	JMP fim_loop
+fim_loop:
+	MOV R10, 1					; valor que representa o jogo estar em pausa
+	MOV [PAUSADO], R10			; escreve esse valor						; fica aqui para sempre
+	MOV	R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
+	MOV R9,TECLA_3				; tecla para começar o jogo
+	CMP	R3, R9					; é a tecla para começar o jogo?
+	JZ recomeca_jogo			; se sim, vai recomeçar
+	JMP fim_loop				; se nao, fica aqui
+
+recomeca_jogo:
+	MOV R10, 0					; valor que representa o jogo nao estar em pausa/terminado
+	MOV [PAUSADO], R10			; escreve esse valor
+	MOV [MORTE], R10			; escreve esse valor
+	MOV [APAGA_ECRÃ], R4		; apaga todos os pixels já desenhados
+	MOV	R1, 0					; cenário de fundo número 0
+	MOV [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+	MOV R3, 1					; valor que significa um novo começo de jogo
+	MOV [RESET], R3				; atribui esse valor
+	MOV [RESET2], R3
+	MOV R3, DECIMAL_100			; valor de energia inicial
+	MOV [ENERGIA], R3			; atribui esse valor
+	MOV R3, MAX_LINHA
+	MOV R3, MAX_LINHA
+	JMP fim
+
 
 
 
@@ -555,7 +601,12 @@ energia:						; processo que decrementa a energia
 	CALL desincrementa_energia	; decrementa a energia
 	JMP energia					; sai
 parar:
-	CALL fim_de_jogo			; fim de jogo
+	MOV  [APAGA_ECRÃ], R1	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
+	MOV	 R1, 1				; cenário de fundo número 1
+    MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+	MOV R1, 1				; valor que significa ter perdido o jogo
+	MOV [MORTE], R1			; escreve esse valor
+	JMP energia
 
 
 ; **********************************************************************
@@ -566,7 +617,7 @@ parar:
 ; **********************************************************************
 
 PROCESS SP_inicial_tubarao	
-tubarao:					; processo que implementa o comportamento do tubarao
+tubarao:					; processo que implementa o comportamento do tubarao				
 	DI						; desativa as interrupções (geral)
 	; desenha o tubarao na sua posição inicial
     MOV R1, LINHA			; linha do tubarão
@@ -575,11 +626,28 @@ tubarao:					; processo que implementa o comportamento do tubarao
 	MOV R5, 8				; atraso do tubarão
 
 ciclo_tubarao:
-	CALL desenha_tubarao	; desenha o tubarao a partir da tabela
+
 espera_movimento:
 
 testa_mover_direita:
 	MOV	R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
+verifica_pausa:
+	MOV R10, [PAUSADO]			; valor que representa o jogo estar em pausa
+	CMP R10, 0					; ve se esta em pausa
+	JNZ ciclo_tubarao			; se estiver, nao desenha o tubarao
+	MOV R10, [MORTE]			; valor que representa o tubarao estar morto
+	CMP R10, 0					; ve se esta em morto
+	JNZ ciclo_tubarao			; se estiver, nao desenha o tubarao
+
+verfica_novo_jogo:
+	MOV R11, [RESET]			; valor de novo jogo
+	CMP R11, 0					; ve se estamos num novo jogo
+	JNZ reseta_estado_jogo		; se sim, vai resetar os valores das posicoes
+recomeca:
+	JNZ tubarao					; sai
+
+	
+	CALL desenha_tubarao	; desenha o tubarao a partir da tabela
 	MOV R9, TECLA_E			; tecla para andar para a direita
 	CMP	R3, R9				; é a tecla para andar para a direita?
 	JZ move_direita			; se sim, move
@@ -611,6 +679,14 @@ move:
 	MOV[posicao_tubarao+2], R2 ; guarda a posicao da coluna do tubarão
 	JMP	ciclo_tubarao
 
+reseta_estado_jogo:
+	MOV R11, 0				; valor normal de jogo
+	MOV [RESET], R11		; escreve esse valor
+	YIELD					
+	MOV [RESET2], R11		; escreve esse valor
+
+	JMP recomeca			; sai
+
 
 
 ; **********************************************************************
@@ -625,6 +701,9 @@ missil:
 	; desenha o missil na sua posição inicial
 espera_tecla_disparar:
 	MOV	R3, [tecla_carregada]	; lê o LOCK e bloqueia até o teclado escrever nele novamente
+	MOV R10, [PAUSADO]			; valor que representa o jogo estar em pausa
+	CMP R10, 0					; ve se esta em pausa
+	JNZ missil					; se estiver, nao desenha o missil
 	MOV R9,TECLA_C				; tecla para disparar o missil
 	
 	MOV R2,[posicao_tubarao+2]	; posição do tubarão(coluna)
@@ -648,6 +727,9 @@ ciclo_missil_energia:
 	MOV [ENERGIA], R11			; escreve o novo valor da energia
 	
 ciclo_missil:
+	MOV R4, [RESET]				; valor de começar um novo jogo
+	CMP R4, 1					; ve se é um novo jogo
+	JZ missil					; se é, nao desenha o resto da trajetória do missil
 	MOV R4, [EXPLOSAO_ACONTECEU]; le o valor de estado de explosoes
 	CMP R4, 0					; valor de NAO ha explosao
 	JNZ houve_explosao			; se houve explosao, sai daqui
@@ -717,29 +799,38 @@ mina:
 	CALL rand					; obtem um numero random
 	MOV R7, 8					
 	MUL R4, R7					; multiplica o numero por 8
-	MOV [R9+R10], R4			; NAOSEI
-	MOV R2, [R9+R10]			; linha do tubarao
-	MOV R9,linhas_objetos			; linhas em que cada mina está
+	MOV [R9+R10], R4			; obtem enderco de cada instancia
+	MOV R2, [R9+R10]			; coluna para cada
+	MOV R9,linhas_objetos		; linhas em que cada mina está
 	
-	MOV	R1, [R9+R10]			; NAOSEI
+	MOV	R1, [R9+R10]			; linha para cada objeto
 	MOV R4, [TABELA_MINA]		; tamanho da mina default
-	MOV R7, 1					; NAOSEI
+	MOV R7, 1					
 	
-	MOV R11,0					; NAOSEI
+	MOV R11,0					
 
 ciclo_mina:
+	MOV R5, [RESET]				; valor de estado de reset
+	CMP R5, 1					; ve se houve um reset
+	JZ tira_minas				; se houve, retira as minas do ecra
+ciclo_mina_aux:
 	CALL desenha_objeto			; desenha a mina
-	MOV  R9, objeto_anda			; LOCK para ver se é para deslocar a mina
+	MOV  R9, objeto_anda		; LOCK para ver se é para deslocar a mina
 	MOV  R3, [R9]				; lê o LOCK desta instância (bloqueia até a rotina de interrupção
 								; respetiva escrever neste LOCK)
 								; Quando bloqueia, passa o controlo para outro processo
-								; Como não há valor a transmitir, o registo pode ser um qualquer		
+								; Como não há valor a transmitir, o registo pode ser um qualquer
+	JMP testa_descer			
+tira_minas:
+	MOV R1, MAX_LINHA			; realoca a mina para a ultima linha
+	JMP ciclo_mina_aux
+	
 
 testa_descer:					; verifica se pode descer a mina
 	MOV R9, MAX_LINHA			; linha maxima
 	CMP R1, R9					; ve se esta na linha maxima
 	JZ mina						; se estiver, nao desce, volta ao inicio
-	CMP R11, 2					; NAOSEI
+	CMP R11, 2					; verifica as probabilidades
 	JGE	mina_evolui				; verifica qual desenho da minha é para desenhar
 
 
@@ -777,31 +868,48 @@ mina4:
 mina5:
 	JMP desce_mina				; vai descer
 
-
+peixe:						; instância de um peixe
+	MOV R10, R11			; cópia do nº de instância do processo
+	SHL R10, 1				; multiplica por 2 porque as tabelas são de WORDS
+	MOV R9, objetosSP_tab	; tabela com os SPs iniciais das várias instâncias deste processo
+	MOV	SP, [R9+R10]		; re-inicializa SP deste processo, de acordo com o nº de instância
+	MOV R9, coluna_objetos	; colunas iniciais dos objetos
+	CALL rand				; obtem um número random
+	MOV R7,8				; 
+	MUL R4,R7				
+	MOV [R9+R10], R4		; obtem o endereco dos objetos
+	MOV R2, [R9+R10]		; coluna de cada objeto
+	MOV R9, linhas_objetos	; linhas em que cada objeto está
+	
+	MOV	R1, [R9+R10]		; linha de cada objeto
+	MOV R4, [TABELA_PEIXE]	; tamanho do peixe default
+	MOV R7, 1				
+	MOV R11,0				
+	JMP ciclo_peixe
 
 desce_mina:						; desce a mina
-	CALL apaga_objeto				; apaga a mina
-	ADD R1, 1					; NAOSEI
+	CALL apaga_objeto			; apaga a mina
+	ADD R1, 1					; adciona 1 a altura
 
 testa_colisao_missil:			; testa a colisao de uma mina com um missil
 	MOV R5,[posicao_missil]		; obtem posição (linha do missil)
 	MOV R6,[posicao_missil+2]	; obtem posição (coluna do missil)
-	MOV R9, 0					; NAOSEI
-	MOV R9, R1					; NAOSEI		
-	ADD R9, 5					; NAOSEI
-	CMP R9, R5					; NAOSEI
-	JLT verifica_colisao_tubarao; NAOSEI
+	MOV R9, 0					
+	MOV R9, R1							
+	ADD R9, 5					
+	CMP R9, R5					
+	JLT verifica_colisao_tubarao;  verifica se o objeto esta para cima do missil
 
-	CMP R1, R5					; NAOSEI
-	JGT verifica_colisao_tubarao; NAOSEI
+	CMP R1, R5					
+	JGT verifica_colisao_tubarao; verifica se o objeto esta para baixo do missil
 
-	CMP R6, R2					; NAOSEI
-	JLT verifica_colisao_tubarao; NAOSEI
+	CMP R6, R2					
+	JLT verifica_colisao_tubarao; verifica se o objeto esta para esquerda do missil
 
-	MOV R10, R2					; NAOSEI
-	ADD R10, 5					; NAOSEI
-	CMP R6, R10					; NAOSEI
-	JGT verifica_colisao_tubarao; NAOSEI
+	MOV R10, R2					
+	ADD R10, 5					
+	CMP R6, R10					
+	JGT verifica_colisao_tubarao; verifica se o objeto esta para direita do missil
 	; houve colisão
 	MOV R9, 0					; seleciona o som 0
 	MOV [TOCA_SOM], R9			; toca o som 
@@ -827,62 +935,59 @@ tempo_mina_explosao:			; tempo de duração da explosão
 verifica_colisao_tubarao:		; verifica se a mina colidiu com um tubarão
 	MOV R5, [posicao_tubarao]	; lê a posição (linha) do tubarão
 	MOV R6, [posicao_tubarao+2] ; lê a posiçaõ (coluna) do tubarão
-	MOV R9, R1					; NAOSEI esta toda, comenta pls
+	MOV R9, R1					
 	ADD R9, 5
 	CMP R9, R5
-	JLT ciclo_mina
+	JLT ciclo_mina ; verifica se o objeto esta para cima do tubarao
 
-	MOV R9, R5					; NAOSEI esta toda, comenta pls
+	MOV R9, R5					
 	ADD R5, 5
 	CMP R1, R5
-	JGT ciclo_mina
+	JGT ciclo_mina ; verifica se o objeto esta para baixo do tubarao
 
-	MOV R8, R6					; NAOSEI esta toda, comenta pls
+	MOV R8, R6		;verifica se o objeto esta para esquerda do tubarao
 	ADD R6, 5
 	CMP R6, R2
-	JLT ciclo_mina				; NAOSEI esta toda, comenta pls
+	JLT ciclo_mina		;verifica se o objeto esta para direita do tubarao
 
 	MOV R10, R2
 	ADD R10, 5
 	CMP R8, R10
 	JGT ciclo_mina
-	MOV R9,3			; seleciona o som 3
-	MOV [TOCA_SOM],R9	; toca o som
-	JMP fim_de_jogo				; se houve colisão, perde o jogo
+	MOV R9,3					; seleciona o som 3
+	MOV [TOCA_SOM],R9			; toca o som
 
-
-peixe:						; instância de um peixe
-	MOV R10, R11			; cópia do nº de instância do processo
-	SHL R10, 1				; multiplica por 2 porque as tabelas são de WORDS
-	MOV R9, objetosSP_tab	; tabela com os SPs iniciais das várias instâncias deste processo
-	MOV	SP, [R9+R10]		; re-inicializa SP deste processo, de acordo com o nº de instância
-	MOV R9, coluna_objetos	; colunas iniciais dos objetos
-	CALL rand				; obtem um número random
-	MOV R7,8				; NAOSEI
-	MUL R4,R7				; NAOSEI
-	MOV [R9+R10], R4		; NAOSEI
-	MOV R2, [R9+R10]		; linha do tubarao
-	MOV R9, linhas_objetos	; linhas em que cada objeto está
+	MOV  [APAGA_ECRÃ], R1	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
+	MOV	 R1, 1				; cenário de fundo número 1
+    MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
+	MOV [MORTE], R1			; Atribui o valor que aconteceu uma morte
+	YIELD
+	JMP objeto
 	
-	MOV	R1, [R9+R10]		; NAOSEI
-	MOV R4, [TABELA_PEIXE]	; tamanho do peixe default
-	MOV R7, 1				; NAOSEI
-	MOV R11,0				; NAOSEI
 
 ciclo_peixe:
+	MOV R5, [RESET2]			; valor de que aconteceu um reset
+	CMP R5, 1					; verifica se aconteceu um reset
+	JZ tira_peixes				; se aconteceu, retira os peixes
+ciclo_peixe_aux:
 	CALL desenha_objeto		; desenha o peixe 
 	MOV R9, objeto_anda	; avisa que é para tentar mover o peixe
 	MOV R3, [R9]			; lê o LOCK desta instância (bloqueia até a rotina de interrupção
 							; respetiva escrever neste LOCK)
 							; Quando bloqueia, passa o controlo para outro processo
-							; Como não há valor a transmitir, o registo pode ser um qualquer		
+							; Como não há valor a transmitir, o registo pode ser um qualquer
+	JMP testa_descer_peixe		
+
+tira_peixes:
+	MOV R1, MAX_LINHA		; realoca os peixes para a ultima linha
+	JMP ciclo_peixe_aux
 
 testa_descer_peixe:			; testa tentar descer o peixe
 	MOV R9,MAX_LINHA		; linha maxima onde o peixe pode estar
 	CMP R1,R9				; ve se está na linha maxima
 	JZ peixe				; se tiver, sai
 
-	CMP R11,2				; NAOSEI
+	CMP R11,2				; verifica a probabilidade
 	JGE	peixe_evolui		; vai ver qual tamanho de peixe é para desenhar
 
 
@@ -922,12 +1027,12 @@ peixe5:						; tamanho default, peixe5
 
 desce_peixe:				; desce o peixe por uma linha
 	CALL apaga_objeto		; apaga o peixe
-	ADD R1, 1				; NAOSEI
+	ADD R1, 1				; desde para a proxima linha
 
 testa_colisao_missil_peixe:
 	MOV R5,[posicao_missil]		; obtem a posição (linha) do missil
 	MOV R6,[posicao_missil+2]	; obtem a posição (coluna) do missil
-	MOV R9,0				; NAOSEI, completa até ao fim deste pedaço pls
+	MOV R9,0				; 
 	MOV R9,R1
 	ADD R9,5
 	CMP R9,R5
@@ -963,30 +1068,31 @@ tempo_peixe_explosao:
 verifica_colisao_tubarao_peixe: ; verifica a colisão do peixe com o tubarão
 	MOV R5, [posicao_tubarao]	; obtem a posição do tubarão (linha)
 	MOV R6, [posicao_tubarao+2]	; obtem a posição do tubarão (coluna)
-	MOV R9, R1					; NAOSEI, completa ate ao fim pls
+	MOV R9, R1				
 	ADD R9, 5
 	CMP R9, R5
-	JLT ciclo_peixe
+	JLT ciclo_peixe	;  verifica se o objeto esta para cima do missil
 
 	MOV R9, R5
 	ADD R5, 5
 	CMP R1, R5
-	JGT ciclo_peixe
+	JGT ciclo_peixe ;  verifica se o objeto esta para baixo do missil
 
 	MOV R8, R6
 	ADD R6, 5
 	CMP R6, R2
-	JLT ciclo_peixe
+	JLT ciclo_peixe ;  verifica se o objeto esta para esquerda do missil
 
 	MOV R10, R2
 	ADD R10, 5
 	CMP R8, R10
-	JGT ciclo_peixe
+	JGT ciclo_peixe ;  verifica se o objeto esta para direita do missil
 
 	CALL incrementa_energia_peixe	; incrementa a energia
 	MOV R9,1			; seleciona o som 1
 	MOV [TOCA_SOM],R9	; toca o som
-	JMP mina
+	JMP objeto
+
 
 ; **********************************************************************
 ; * ROTINAS                                                            
@@ -1183,18 +1289,6 @@ sai_testa_limites:
 	POP	R5
 	RET
 
-
-; **********************************************************************
-; fim_de_jogo - termina o jogo e muda o ecra
-; **********************************************************************
-fim_de_jogo:
-    MOV  [APAGA_ECRÃ], R1	; apaga todos os pixels já desenhados (o valor de R1 não é relevante)
-	MOV	 R1, 1				; cenário de fundo número 1
-    MOV  [SELECIONA_CENARIO_FUNDO], R1	; seleciona o cenário de fundo
-	ciclo_fim_de_jogo:		; fim de jogo
-	JMP ciclo_fim_de_jogo
-	RET
-
 ; **********************************************************************
 ; Rand - aleatorio
 ; Retorna:	R4 - um número aleatório entre 0  e 9
@@ -1285,8 +1379,8 @@ desincrementa_energia:
 
 ; **********************************************************************
 ; calcula_output - calcula qual o numero da tecla do tecla que foi premida
-; Argumentos: R[NAOSEI] - linha da tecla premida
-;			  R[NAOSEI] - linha da coluna premida
+; Argumentos: R6 - linha da tecla premida
+;			  R0 - linha da coluna premida
 ; Retorna: R0 - numero da tecla
 ; **********************************************************************
 calcula_output:		   ; Calcula o valor da tecla premida (0 a F)
@@ -1302,14 +1396,14 @@ calcula_output:		   ; Calcula o valor da tecla premida (0 a F)
     MOV R8,1            
 
 calcula_linha:         ; Conta qual a linha, a partir da 0
-    SHR R9,1           ;NAOSEI
-    ADD R5,R8          ;NAOSEI
-    CMP R9,0           ;NAOSEI
-    JNZ calcula_linha  ;NAOSEI
-    SUB R5,R8          ;NAOSEI
+    SHR R9,1           
+    ADD R5,R8          
+    CMP R9,0           
+    JNZ calcula_linha  
+    SUB R5,R8          ;
      
 calcula_coluna:        ; Conta qual a coluna, a partir da 0
-    SHR R11,1          ;NAOSEI esta rotina a serio nunca a percebi lol
+    SHR R11,1          
     ADD R7,R8          
     CMP R11,0          
     JNZ calcula_coluna 
